@@ -866,29 +866,82 @@ onMounted(loadMembersAreaData)
         </div>
       </template>
 
-      <div v-if="showModuleModal" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-60">
-        <div class="bg-white rounded-lg shadow-xl w-full max-w-5xl p-6 relative">
-          <button type="button" class="absolute right-6 top-5 text-gray-400 text-3xl" @click="showModuleModal = false">×</button>
-          <h3 class="text-xl font-medium text-gray-900">Salvar alterações</h3>
-          <div class="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-12">
-            <div>
-              <label class="block text-sm font-medium leading-5 text-gray-700 mb-2">Nome do módulo</label>
-              <input v-model="moduleDraft.title" class="form-input block w-full py-3 px-4 border border-gray-300 rounded-md shadow-sm text-sm leading-5">
-              <label class="block text-sm font-medium leading-5 text-gray-700 mt-6 mb-2">Imagem</label>
-              <div class="relative rounded-md overflow-hidden bg-gray-400 h-64 flex items-center justify-center">
-                <img v-if="moduleDraft.imageUrl || coverUrl" :src="moduleDraft.imageUrl || coverUrl" alt="" class="w-full h-full object-cover opacity-70">
-                <button type="button" class="absolute h-12 w-12 rounded-full bg-black bg-opacity-40 text-white text-3xl" @click="moduleDraft.imageUrl = coverUrl">+</button>
+      <div v-if="showModuleModal" class="fixed inset-0 z-500 flex flex-col md:items-center md:justify-center md:h-auto md:max-h-full md:p-4">
+        <div class="fixed inset-0 transition-opacity cursor-pointer" @click="showModuleModal = false">
+          <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <div role="dialog" aria-modal="true" aria-labelledby="modal-headline" class="bg-white h-full overflow-x-auto transform transition-all w-full sm:h-auto md:max-h-full md:rounded-lg md:shadow-xl sm:max-w-3xl">
+          <div class="px-4 py-3 bg-gray-50 flex justify-between">
+            <h3 id="modal-headline" class="text-lg leading-6 font-medium text-gray-900">Adicionar módulo</h3>
+            <button type="button" aria-label="Close" class="text-gray-400 cursor-pointer hover:text-gray-500 focus:outline-none focus:text-gray-500 transition ease-in-out duration-150" @click="showModuleModal = false">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-6 w-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+          </div>
+          <div class="flex flex-wrap">
+            <div class="w-full md:w-1/2">
+              <div>
+                <div class="px-4 py-5 sm:p-6 rounded-lg">
+                <div>
+                  <label class="block text-sm font-medium leading-5 text-gray-700 mb-1">Nome do módulo</label>
+                  <div>
+                    <input v-model="moduleDraft.title" type="text" autocomplete="off" data-lpignore="true" class="form-input block py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:shadow-outline-blue focus:border-blue-300 transition duration-150 ease-in-out sm:text-sm sm:leading-5 mask-user-input w-full">
+                  </div>
+                </div>
+                <div class="mt-4">
+                  <label class="label mb-1">Imagem</label>
+                  <div>
+                    <label for="module-image-upload" id="moduleimageupload" class="hover:bg-gray-50 cursor-pointer flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 transition duration-300 border-dashed rounded-md h-48 items-center max-w-lg">
+                      <div v-if="moduleDraft.imageUrl || coverUrl" class="relative w-full h-full">
+                        <img :src="moduleDraft.imageUrl || coverUrl" alt="" class="w-full h-full object-cover">
+                        <button type="button" class="absolute inset-0 m-auto h-12 w-12 rounded-full bg-black bg-opacity-60 text-white text-3xl" @click.prevent="moduleDraft.imageUrl = coverUrl">+</button>
+                      </div>
+                      <div v-else class="space-y-1 text-center">
+                        <svg stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true" class="mx-auto h-12 w-12 text-gray-400"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                        <div class="flex flex-col text-sm text-gray-600">
+                          <div class="relative cursor-pointe rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
+                            <span>Selecione do computador</span>
+                            <input id="module-image-upload" accept="image/jpeg,image/jpg,image/png" name="moduleimageupload" type="file" class="sr-only">
+                          </div>
+                          <p class="pl-1">ou arraste aqui</p>
+                        </div>
+                        <p class="text-xs text-gray-500">PNG, JPG até 10 MB</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+                <div class="mt-4">
+                  <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-8">
+                    <div class="flex items-center">
+                      <div class="flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="24px" height="24px" class="text-yellow-400"><path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z"></path></svg>
+                      </div>
+                      <div class="ml-3">
+                        <p class="text-sm leading-5 text-yellow-700">Tamanho recomendado: 320x480 pixels</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="flex w-full mt-4">
+                  <button class="cursor-pointer flex justify-center items-center text-center w-full px-4 py-2 border border-transparent text-base leading-6 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-500 focus:outline-none focus:border-indigo-700 focus:shadow-outline-indigo active:bg-indigo-700 transition ease-in-out duration-150" @click="saveModuleDraft">
+                    {{ selectedModule ? 'Salvar alterações' : 'Adicionar módulo' }}
+                  </button>
+                </div>
+                </div>
               </div>
-              <div class="mt-5 bg-yellow-50 border-l-4 border-yellow-500 p-4 text-yellow-800">Tamanho recomendado: 320x480 pixels</div>
-              <button type="button" class="mt-8 w-full inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-white bg-indigo-600 hover:bg-indigo-500 border-transparent leading-5 text-base px-4 py-4 shadow-sm" @click="saveModuleDraft">Salvar alterações</button>
             </div>
-            <div>
-              <div class="text-base font-medium text-gray-500 mb-3">Pré-visualização</div>
-              <div class="relative mx-auto bg-black p-5" style="width: 360px; min-height: 520px;">
-                <img v-if="moduleDraft.imageUrl || coverUrl" :src="moduleDraft.imageUrl || coverUrl" alt="" class="w-full h-full object-cover" style="min-height: 480px;">
-                <div v-else class="bg-gradient-to-br from-cyan-500 to-yellow-300" style="height: 480px;"></div>
-                <span class="absolute top-10 right-10 bg-gray-800 bg-opacity-80 text-white rounded-md px-4 py-2">{{ selectedModule?.contents?.length || 0 }} Aula</span>
-                <div class="absolute left-10 right-10 bottom-20 text-white text-4xl font-bold uppercase">{{ moduleDraft.title }}</div>
+            <div class="w-full md:w-1/2 py-2 px-6">
+              <div>
+                <dt class="text-sm font-medium text-gray-500">Pré-visualização</dt>
+                <dd class="mt-1 border p-4 bg-black text-gray-600 w-full">
+                  <div class="bg-black relative w-full shadow-lg rounded-md" style="padding-bottom: 136%;">
+                    <img :src="moduleDraft.imageUrl || coverUrl || '/_nuxt/img/module_preview.420776f.png'" alt="" class="absolute w-full select-none pointer-events-none">
+                    <div class="flex justify-end w-full">
+                      <div class="bg-gray-800 mr-4 text-sm font-medium bg-opacity-75 rounded-md mt-4 text-white px-6 py-1 relative z-10">
+                        {{ selectedModule?.contents?.length || 0 }} Aulas
+                      </div>
+                    </div>
+                  </div>
+                </dd>
               </div>
             </div>
           </div>
