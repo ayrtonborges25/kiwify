@@ -300,20 +300,21 @@ const lessonDescriptionParts = computed(() => {
 }
 
 .club-lesson-view__check {
-  width: 28px;
-  height: 28px;
+  width: 20px;
+  height: 20px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: 4px;
   color: #fff;
   background: #facc15;
+  font-size: 14px;
   font-weight: 800;
 }
 
 .club-lesson-view__thumb {
-  height: 108px;
-  border-radius: 7px;
+  height: 76px;
+  border-radius: 6px;
   border-bottom: 5px solid #ef4444;
   display: flex;
   align-items: center;
@@ -323,8 +324,8 @@ const lessonDescriptionParts = computed(() => {
 }
 
 .club-lesson-view__thumb svg {
-  width: 52px;
-  height: 52px;
+  width: 36px;
+  height: 36px;
 }
 
 .club-lesson-view {
@@ -342,8 +343,8 @@ const lessonDescriptionParts = computed(() => {
 }
 
 .club-lesson-view__back {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   border: 0;
   color: #aeb4c0;
   background: transparent;
@@ -351,55 +352,55 @@ const lessonDescriptionParts = computed(() => {
 }
 
 .club-lesson-view__back svg {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
 }
 
 .club-lesson-view__toolbar {
   position: absolute;
-  top: 72px;
+  top: 126px;
   right: 48px;
   display: flex;
   align-items: center;
   gap: 26px;
   color: #60636d;
-  font-size: 28px;
+  font-size: 26px;
 }
 
 .club-lesson-view__toolbar button {
   border: 0;
   color: #7e8490;
   background: transparent;
-  font-size: 46px;
+  font-size: 42px;
   cursor: pointer;
 }
 
 .club-lesson-view__content {
-  margin-top: 48px;
+  margin-top: 0;
   max-width: 820px;
 }
 
 .club-lesson-view__content p {
   margin: 0 0 14px;
   color: #facc15;
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 700;
 }
 
 .club-lesson-view__content h1 {
   margin: 0;
-  font-size: 34px;
+  font-size: 30px;
   line-height: 1.2;
   font-weight: 800;
 }
 
 .club-lesson-view__text {
-  margin-top: 140px;
+  margin-top: 126px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   color: #d7d7dc;
-  font-size: 28px;
+  font-size: 24px;
   line-height: 1.35;
 }
 
@@ -413,7 +414,7 @@ const lessonDescriptionParts = computed(() => {
 }
 
 .club-lesson-view__aside header {
-  height: 88px;
+  height: 96px;
   padding: 0 24px;
   display: flex;
   align-items: center;
@@ -446,15 +447,15 @@ const lessonDescriptionParts = computed(() => {
   width: 100%;
   min-height: 128px;
   display: grid;
-  grid-template-columns: 28px 132px 1fr;
+  grid-template-columns: 20px 132px 1fr;
   align-items: center;
-  gap: 14px;
+  gap: 18px;
   border: 0;
   color: #fff;
   background: #1d1e22;
   text-align: left;
   cursor: pointer;
-  padding: 18px 24px;
+  padding: 16px 24px;
 }
 
 .club-lesson-view__lesson--active {
@@ -462,7 +463,7 @@ const lessonDescriptionParts = computed(() => {
 }
 
 .club-lesson-view__lesson span:last-child {
-  font-size: 24px;
+  font-size: 22px;
   line-height: 1.2;
 }
 
