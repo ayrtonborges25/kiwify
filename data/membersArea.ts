@@ -39,6 +39,48 @@ export interface MembersAreaSettings {
 }
 
 export interface MembersAreaCustomization {
+  theme?: {
+    primaryColor?: string
+    sidebarColor?: string
+    backgroundColor?: string
+    textColor?: string
+  }
+  sidebar?: {
+    logoUrl?: string
+    brandName?: string
+    title?: string
+    collapsed?: boolean
+    links?: {
+      home?: string
+      instagram?: string
+      support?: string
+      instagramUrl?: string
+      supportUrl?: string
+    }
+  }
+  home?: {
+    banner?: {
+      title?: string
+      imageUrl?: string
+      visible?: boolean
+    }
+    slides?: Array<{
+      id: string
+      title?: string
+      imageUrl?: string
+    }>
+    sections?: Array<{
+      id: string
+      type: string
+      title: string
+      subtitle?: string
+      imageUrl?: string
+      visible?: boolean
+    }>
+  }
+  menu?: Record<string, any>
+  login?: Record<string, any>
+  settings?: Record<string, any>
   logoUrl?: string
   bannerUrl?: string
   primaryColor?: string

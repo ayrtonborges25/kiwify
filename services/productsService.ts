@@ -17,6 +17,7 @@ export type ProductSettingsPayload = {
   autoCurrencyEnabled?: boolean
   thankYouEnabled?: boolean
   thankYouUrl?: string
+  upsellSettings?: Record<string, any>
 }
 
 export type ProductMembersAreaMode = 'new' | 'existing' | 'external'
@@ -192,7 +193,8 @@ const mapProductFromSupabase = (row: Record<string, any>, relations: {
         collectInstagramEnabled: Boolean(relations.settings.collect_instagram_enabled),
         autoCurrencyEnabled: Boolean(relations.settings.auto_currency_enabled),
         thankYouEnabled: Boolean(relations.settings.thank_you_enabled),
-        thankYouUrl: relations.settings.thank_you_url || undefined
+        thankYouUrl: relations.settings.thank_you_url || undefined,
+        upsellSettings: relations.settings.upsell_settings || undefined
       }
     : productSettingsStore[row.id]
 })
@@ -498,7 +500,8 @@ export const updateProduct = async (id: string, payload: UpdateProductPayload = 
           collect_instagram_enabled: Boolean(payload.settings.collectInstagramEnabled),
           auto_currency_enabled: Boolean(payload.settings.autoCurrencyEnabled),
           thank_you_enabled: Boolean(payload.settings.thankYouEnabled),
-          thank_you_url: payload.settings.thankYouUrl || null
+          thank_you_url: payload.settings.thankYouUrl || null,
+          upsell_settings: payload.settings.upsellSettings || {}
         }
 
         let settingsResult = await supabase

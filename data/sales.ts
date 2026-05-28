@@ -1,6 +1,7 @@
 export interface Sale {
   id: string
   productId?: string
+  offerId?: string
   product: string
   customer: string
   customerEmail?: string

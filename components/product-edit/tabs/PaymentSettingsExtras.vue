@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import type { Offer } from '~/data/offers'
+import { listOffersByProduct } from '~/services/offersService'
+
 const route = useRoute()
 const productId = computed(() => String(route.params.id || 'ae3c3610-f0af-11f0-b85d-45218e98c266'))
 const { products, updateProduct } = useProducts()
@@ -31,10 +34,13 @@ const purchasePixEnabled = ref(false)
 const purchaseBoletoEnabled = ref(false)
 const couponsEnabled = ref(false)
 const showOrderBumpModal = ref(false)
+const showUpsellModal = ref(false)
 const hydratingThankYou = ref(false)
 const thankYouDirty = ref(false)
 const hydratedProductId = ref('')
 let thankYouPersistTimer: ReturnType<typeof setTimeout> | undefined
+const upsellOffers = ref<Offer[]>([])
+const upsellCopied = ref(false)
 
 const pixels = ref<PixelRow[]>([
   {
@@ -56,9 +62,27 @@ const orderBumpDraft = reactive({
 
 const availableProducts = computed(() => products.value.filter((product) => product.id !== productId.value))
 const currentProduct = computed(() => products.value.find((product) => product.id === productId.value))
+const upsellDraft = reactive({
+  productId: '',
+  offerId: '',
+  acceptAction: 'offer',
+  declineAction: 'members_area',
+  acceptText: 'Sim, eu aceito essa oferta especial!',
+  declineText: 'Não, eu gostaria de recusar essa oferta',
+  color: '#2ECC70'
+})
 const selectedProductName = computed(() => {
   if (orderBumpDraft.product) return orderBumpDraft.product
   return availableProducts.value[0]?.name || 'Selecione o produto'
+})
+const selectedUpsellOffer = computed(() => upsellOffers.value.find((offer) => offer.id === upsellDraft.offerId))
+const generatedUpsellHtml = computed(() => {
+  const upsellUrl = upsellDraft.acceptAction === 'offer' && upsellDraft.offerId ? `/checkout/${upsellDraft.offerId}` : ''
+  const downsellUrl = upsellDraft.declineAction === 'offer' && upsellDraft.offerId ? `/checkout/${upsellDraft.offerId}` : ''
+  return `<div style="text-align:center" id="kiwify-upsell-${productId.value}" data-upsell-url="${upsellUrl}" data-downsell-url="${downsellUrl}">
+          <button id="kiwify-upsell-trigger-${productId.value}" style="background-color:${upsellDraft.color};padding:12px 16px;cursor:pointer;color:#FFFFFF;font-weight:600;border-radius:4px;border:1px solid ${upsellDraft.color};font-size:20px;">${upsellDraft.acceptText}</button>
+          <div id="kiwify-upsell-cancel-trigger-${productId.value}" style="margin-top:1rem;cursor:pointer;font-size:16px;text-decoration:underline;font-family:sans-serif;">${upsellDraft.declineText}</div>
+        </div><script src="https://snippets.kiwify.com/upsell/upsell.min.js"><\\/script>`
 })
 
 const switchRootClass = (enabled: boolean) => [
@@ -109,6 +133,59 @@ const openOrderBumpModal = () => {
   showOrderBumpModal.value = true
 }
 
+const hydrateUpsellDraft = async () => {
+  const settings = currentProduct.value?.settings?.upsellSettings || {}
+  upsellDraft.productId = settings.productId || availableProducts.value[0]?.id || ''
+  upsellDraft.offerId = settings.offerId || ''
+  upsellDraft.acceptAction = settings.acceptAction || 'offer'
+  upsellDraft.declineAction = settings.declineAction || 'members_area'
+  upsellDraft.acceptText = settings.acceptText || 'Sim, eu aceito essa oferta especial!'
+  upsellDraft.declineText = settings.declineText || 'Não, eu gostaria de recusar essa oferta'
+  upsellDraft.color = settings.color || '#2ECC70'
+  if (upsellDraft.productId) {
+    upsellOffers.value = await listOffersByProduct(upsellDraft.productId)
+    if (!upsellDraft.offerId) upsellDraft.offerId = upsellOffers.value[0]?.id || ''
+  }
+}
+
+const openUpsellModal = async () => {
+  await hydrateUpsellDraft()
+  upsellCopied.value = false
+  showUpsellModal.value = true
+}
+
+const closeUpsellModal = () => {
+  showUpsellModal.value = false
+}
+
+const saveUpsellSettings = async () => {
+  thankYouEnabled.value = true
+  await updateProduct(productId.value, {
+    settings: {
+      ...(currentProduct.value?.settings || {}),
+      thankYouEnabled: true,
+      thankYouUrl: thankYouUrl.value.trim(),
+      upsellSettings: {
+        enabled: true,
+        productId: upsellDraft.productId,
+        offerId: upsellDraft.offerId,
+        offerUrl: selectedUpsellOffer.value?.publicUrl || (upsellDraft.offerId ? `/checkout/${upsellDraft.offerId}` : ''),
+        acceptAction: upsellDraft.acceptAction,
+        declineAction: upsellDraft.declineAction,
+        acceptText: upsellDraft.acceptText,
+        declineText: upsellDraft.declineText,
+        color: upsellDraft.color
+      }
+    }
+  })
+}
+
+const copyUpsellHtml = async () => {
+  await saveUpsellSettings()
+  await navigator.clipboard?.writeText(generatedUpsellHtml.value)
+  upsellCopied.value = true
+}
+
 const closeOrderBumpModal = () => {
   showOrderBumpModal.value = false
 }
@@ -131,7 +208,10 @@ const removeOrderBump = (id: string) => {
 }
 
 const onModalKeydown = (event: KeyboardEvent) => {
-  if (event.key === 'Escape') closeOrderBumpModal()
+  if (event.key === 'Escape') {
+    closeOrderBumpModal()
+    closeUpsellModal()
+  }
 }
 
 watch(currentProduct, (product) => {
@@ -181,6 +261,14 @@ const toggleThankYou = () => {
 
 watch([thankYouEnabled, thankYouUrl], persistThankYouSettings)
 
+watch(() => upsellDraft.productId, async (id) => {
+  if (!id || !showUpsellModal.value) return
+  upsellOffers.value = await listOffersByProduct(id)
+  if (!upsellOffers.value.some((offer) => offer.id === upsellDraft.offerId)) {
+    upsellDraft.offerId = upsellOffers.value[0]?.id || ''
+  }
+})
+
 onBeforeUnmount(() => {
   if (thankYouPersistTimer) clearTimeout(thankYouPersistTimer)
 })
@@ -218,7 +306,7 @@ onBeforeUnmount(() => {
                   </div>
                 </div>
                 <div class="mt-4">
-                  <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-700 hover:text-gray-500 active:text-gray-800 bg-white active:bg-gray-50 border-gray-300 focus:border-blue-300 focus:shadow-outline-blue leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm">
+                  <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-700 hover:text-gray-500 active:text-gray-800 bg-white active:bg-gray-50 border-gray-300 focus:border-blue-300 focus:shadow-outline-blue leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm" @click="openUpsellModal">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="24px" height="24px" class="button-icon"><path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
                     Gerador de upsell
                   </button>
@@ -484,6 +572,77 @@ onBeforeUnmount(() => {
           <span class="flex w-full rounded-md shadow-sm sm:ml-3 sm:w-auto"><button type="button" class="bg-indigo-600 hover:bg-indigo-500 focus:shadow-outline-indigo cursor-pointer inline-flex justify-center w-full rounded-md border border-transparent px-4 py-2 text-base leading-6 font-medium text-white shadow-sm focus:outline-none focus:border-red-700 transition ease-in-out duration-150 sm:text-sm sm:leading-5" @click="addOrderBump">Adicionar</button></span>
           <span class="mt-3 flex w-full rounded-md shadow-sm sm:mt-0 sm:w-auto"><button type="button" class="cursor-pointer inline-flex justify-center w-full rounded-md border border-gray-300 px-4 py-2 bg-white text-base leading-6 font-medium text-gray-700 shadow-sm hover:text-gray-500 focus:outline-none focus:border-blue-300 focus:shadow-outline-blue transition ease-in-out duration-150 sm:text-sm sm:leading-5" @click="closeOrderBumpModal">Cancelar</button></span>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="showUpsellModal" class="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+    <div class="absolute inset-0 bg-gray-700 opacity-75" @click="closeUpsellModal"></div>
+    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-3xl overflow-hidden">
+      <div class="flex items-start justify-between px-6 py-5">
+        <div>
+          <h3 class="text-lg leading-6 font-medium text-gray-900">Gerador de upsell</h3>
+          <p class="mt-2 text-sm leading-5 text-gray-500">Crie um botão de upsell para colocar na sua página de obrigado</p>
+        </div>
+        <button type="button" class="text-gray-400 hover:text-gray-500 transition ease-in-out duration-150" @click="closeUpsellModal">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-6 w-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div class="px-6 pb-6 space-y-4">
+        <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start">
+          <label class="text-sm font-medium leading-5 text-gray-700 sm:mt-px sm:pt-2">Produto upsell</label>
+          <select v-model="upsellDraft.productId" class="form-select block w-full sm:col-span-2 rounded-md shadow-sm sm:text-sm sm:leading-5">
+            <option value="">Selecione o produto</option>
+            <option v-for="item in availableProducts" :key="item.id" :value="item.id">{{ item.name }}</option>
+          </select>
+        </div>
+        <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start">
+          <label class="text-sm font-medium leading-5 text-gray-700 sm:mt-px sm:pt-2">Oferta upsell</label>
+          <select v-model="upsellDraft.offerId" class="form-select block w-full sm:col-span-2 rounded-md shadow-sm sm:text-sm sm:leading-5">
+            <option value="">Seleciona a oferta</option>
+            <option v-for="offer in upsellOffers" :key="offer.id" :value="offer.id">{{ offer.label || offer.name }}</option>
+          </select>
+        </div>
+        <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start">
+          <label class="text-sm font-medium leading-5 text-gray-700 sm:mt-px sm:pt-2">Ao aceitar a upsell</label>
+          <select v-model="upsellDraft.acceptAction" class="form-select block w-full sm:col-span-2 rounded-md shadow-sm sm:text-sm sm:leading-5">
+            <option value="offer">Redirecionar para oferta upsell</option>
+            <option value="members_area">Redirecionar para área de membros</option>
+          </select>
+        </div>
+        <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start">
+          <label class="text-sm font-medium leading-5 text-gray-700 sm:mt-px sm:pt-2">Ao recusar a upsell</label>
+          <select v-model="upsellDraft.declineAction" class="form-select block w-full sm:col-span-2 rounded-md shadow-sm sm:text-sm sm:leading-5">
+            <option value="members_area">Redirecionar para área de membros</option>
+            <option value="offer">Redirecionar para oferta upsell</option>
+          </select>
+        </div>
+        <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start">
+          <label class="text-sm font-medium leading-5 text-gray-700 sm:mt-px sm:pt-2">Texto aceitar upsell</label>
+          <input v-model="upsellDraft.acceptText" class="form-input block w-full sm:col-span-2 rounded-md shadow-sm sm:text-sm sm:leading-5">
+        </div>
+        <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start">
+          <label class="text-sm font-medium leading-5 text-gray-700 sm:mt-px sm:pt-2">Texto recusar upsell</label>
+          <input v-model="upsellDraft.declineText" class="form-input block w-full sm:col-span-2 rounded-md shadow-sm sm:text-sm sm:leading-5">
+        </div>
+        <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start">
+          <label class="text-sm font-medium leading-5 text-gray-700 sm:mt-px sm:pt-2">Cor</label>
+          <input v-model="upsellDraft.color" type="color" class="h-12 w-24 form-input rounded-md shadow-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium leading-5 text-gray-700 mb-2">Prévia</label>
+          <div class="border border-gray-300 p-8 text-center">
+            <button type="button" :style="{ backgroundColor: upsellDraft.color, borderColor: upsellDraft.color }" style="padding:12px 16px;cursor:pointer;color:#FFFFFF;font-weight:600;border-radius:4px;border-width:1px;border-style:solid;font-size:20px;">{{ upsellDraft.acceptText }}</button>
+            <div style="margin-top:1rem;cursor:pointer;font-size:16px;text-decoration:underline;font-family:sans-serif;">{{ upsellDraft.declineText }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="bg-gray-50 px-6 py-4 flex justify-end gap-3">
+        <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-700 hover:text-gray-500 active:text-gray-800 bg-white active:bg-gray-50 border-gray-300 leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm" @click="closeUpsellModal">Fechar</button>
+        <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 border-transparent leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm" @click="copyUpsellHtml">
+          <span aria-hidden="true">&lt;/&gt;</span>
+          {{ upsellCopied ? 'HTML copiado' : 'Copiar HTML' }}
+        </button>
       </div>
     </div>
   </div>

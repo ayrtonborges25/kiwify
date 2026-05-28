@@ -38,6 +38,7 @@ const paymentMethodLabel = (billingType?: string, fallback?: string | null) => {
 const mapSale = (row: Record<string, any>) => ({
   id: row.id,
   productId: row.product_id || undefined,
+  offerId: row.offer_id || undefined,
   product: row.products?.name || 'Produto',
   customer: row.customer_name || row.customer_email || 'Cliente',
   customerEmail: row.customer_email || undefined,

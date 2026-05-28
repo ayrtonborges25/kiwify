@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { getSaleById } from '~/services/salesService'
 import { getDeliveryBySaleId, type ProductDelivery } from '~/services/deliveriesService'
+import { getProductById, type ProductDetails } from '~/services/productsService'
 import type { Sale } from '~/data/sales'
 
 definePageMeta({ layout: false })
@@ -9,6 +10,7 @@ const route = useRoute()
 const router = useRouter()
 const sale = ref<Sale | undefined>()
 const delivery = ref<ProductDelivery | undefined>()
+const product = ref<ProductDetails | undefined>()
 const finalAccessUrl = ref('')
 
 const normalizedStatus = computed(() => String(sale.value?.status || '').toLowerCase())
@@ -23,6 +25,27 @@ const accessUrl = computed(() => {
 
   return '/'
 })
+const upsellSettings = computed(() => product.value?.settings?.upsellSettings || {})
+const showUpsell = computed(() => {
+  return isApproved.value && Boolean(upsellSettings.value?.enabled && upsellSettings.value?.offerId)
+})
+const upsellColor = computed(() => String(upsellSettings.value?.color || '#2ECC70'))
+const upsellAcceptText = computed(() => String(upsellSettings.value?.acceptText || 'Sim, eu aceito essa oferta especial!'))
+const upsellDeclineText = computed(() => String(upsellSettings.value?.declineText || 'Não, eu gostaria de recusar essa oferta'))
+const upsellOfferUrl = computed(() => String(upsellSettings.value?.offerUrl || (upsellSettings.value?.offerId ? `/checkout/${upsellSettings.value.offerId}` : '')))
+
+const resolveUpsellTarget = (action?: string) => {
+  if (action === 'offer') return upsellOfferUrl.value || accessUrl.value
+  return accessUrl.value
+}
+
+const acceptUpsell = async () => {
+  await navigateTo(resolveUpsellTarget(String(upsellSettings.value?.acceptAction || 'offer')), { external: /^https?:\/\//.test(resolveUpsellTarget(String(upsellSettings.value?.acceptAction || 'offer'))) })
+}
+
+const declineUpsell = async () => {
+  await navigateTo(resolveUpsellTarget(String(upsellSettings.value?.declineAction || 'members_area')), { external: /^https?:\/\//.test(resolveUpsellTarget(String(upsellSettings.value?.declineAction || 'members_area'))) })
+}
 
 onMounted(async () => {
   const saleId = String(route.params.saleId)
@@ -37,11 +60,14 @@ onMounted(async () => {
     })
     if (result.sale) sale.value = result.sale
     if (result.delivery) delivery.value = result.delivery
-    finalAccessUrl.value = result.thankYouUrl || result.clubUrl || result.delivery?.accessUrl || ''
+    finalAccessUrl.value = result.clubUrl || result.delivery?.accessUrl || ''
   } catch {
     sale.value = await getSaleById(saleId)
     delivery.value = await getDeliveryBySaleId(saleId)
   }
+
+  const productId = sale.value?.productId || delivery.value?.productId
+  if (productId) product.value = await getProductById(productId)
 
   if (!isApproved.value) {
     await router.replace(`/payment/${saleId}`)
@@ -55,6 +81,29 @@ onMounted(async () => {
       <div class="thank-you-icon">✓</div>
       <h1>Obrigado pela compra</h1>
       <p>Seu pagamento foi aprovado e o acesso já está disponível.</p>
+      <div
+        v-if="showUpsell"
+        :id="`kiwify-upsell-${sale?.id || 'thank-you'}`"
+        class="upsell-box"
+        :data-upsell-url="upsellOfferUrl"
+        :data-downsell-url="accessUrl"
+      >
+        <button
+          :id="`kiwify-upsell-trigger-${sale?.id || 'thank-you'}`"
+          :style="{ backgroundColor: upsellColor, borderColor: upsellColor }"
+          class="upsell-accept"
+          @click="acceptUpsell"
+        >
+          {{ upsellAcceptText }}
+        </button>
+        <div
+          :id="`kiwify-upsell-cancel-trigger-${sale?.id || 'thank-you'}`"
+          class="upsell-decline"
+          @click="declineUpsell"
+        >
+          {{ upsellDeclineText }}
+        </div>
+      </div>
       <NuxtLink :to="accessUrl" class="thank-you-link">Acessar produto</NuxtLink>
     </section>
   </main>
@@ -117,5 +166,28 @@ p {
   color: #fff;
   text-decoration: none;
   font-weight: 700;
+}
+
+.upsell-box {
+  text-align: center;
+  margin: 0 0 28px;
+}
+
+.upsell-accept {
+  padding: 12px 16px;
+  cursor: pointer;
+  color: #fff;
+  font-weight: 600;
+  border-radius: 4px;
+  border: 1px solid #2ecc70;
+  font-size: 20px;
+}
+
+.upsell-decline {
+  margin-top: 1rem;
+  cursor: pointer;
+  font-size: 16px;
+  text-decoration: underline;
+  font-family: sans-serif;
 }
 </style>

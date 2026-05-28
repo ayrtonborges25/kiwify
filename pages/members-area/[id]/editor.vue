@@ -1,236 +1,697 @@
 <script setup lang="ts">
+import type { MembersAreaCustomization } from '~/data/membersArea'
+import { uploadFile } from '~/utils/supabase'
+
 useHead({ title: 'Editar Área de Membros' })
+
+type EditorSlide = {
+  id: string
+  title: string
+  imageUrl: string
+}
+
+type EditorSection = {
+  id: string
+  type: string
+  title: string
+  subtitle: string
+  imageUrl: string
+  visible: boolean
+}
+
+type EditorState = {
+  theme: {
+    primaryColor: string
+    sidebarColor: string
+    backgroundColor: string
+    textColor: string
+  }
+  sidebar: {
+    logoUrl: string
+    brandName: string
+    title: string
+    collapsed: boolean
+    links: {
+      home: string
+      instagram: string
+      support: string
+      instagramUrl: string
+      supportUrl: string
+    }
+  }
+  home: {
+    banner: {
+      title: string
+      imageUrl: string
+      visible: boolean
+    }
+    slides: EditorSlide[]
+    sections: EditorSection[]
+  }
+  menu: Record<string, any>
+  login: Record<string, any>
+  settings: Record<string, any>
+}
 
 const route = useRoute()
 const { getMembersAreaById, saveMembersAreaCustomization } = useMembersArea()
 
-const membersAreaId = computed(() => String(route.params.id || 'c6d46bd7-9ced-4fb2-a4a0-ae033e3b612a'))
+const membersAreaId = computed(() => String(route.params.id || '1cbe33c8-14d3-4612-81e4-b52587203765'))
 const membersArea = computed(() => getMembersAreaById(membersAreaId.value))
 const areaName = computed(() => membersArea.value?.name || 'Figurinhas da Copa 2026')
 const coverUrl = computed(() => membersArea.value?.coverUrl || '')
-const areaPath = computed(() => `/members-area/${membersAreaId.value}?tab=settings`)
+const areaPath = computed(() => `/members-area/${membersAreaId.value}?tab=customizations`)
+const publicClubPath = computed(() => `/club=${membersAreaId.value}?editor=1`)
+
 const saving = ref(false)
-const customization = reactive({
-  logoUrl: '',
-  bannerUrl: '',
-  primaryColor: '#4f46e5',
-  sidebarColor: '#facc15',
-  backgroundColor: '#080808',
-  textColor: '#ffffff',
-  brandName: 'RETRATISTAS DIGITAIS',
-  homeLabel: 'Home',
-  instagramLabel: 'Instagram',
-  supportLabel: 'Suporte',
-  heroTitle: '',
-  modulesTitle: 'Uma seção pode conter módulos',
-  visibleSections: ['banner', 'modules'] as string[]
-})
-const activeBannerUrl = computed(() => customization.bannerUrl || coverUrl.value)
-const hasSection = (section: string) => customization.visibleSections.includes(section)
-const toggleSection = (section: string) => {
-  customization.visibleSections = hasSection(section)
-    ? customization.visibleSections.filter((item) => item !== section)
-    : [...customization.visibleSections, section]
+const activeTab = ref<'home' | 'menu' | 'login' | 'settings'>('home')
+const previewMode = ref<'desktop' | 'mobile'>('desktop')
+const selectedItem = ref('banner')
+const showCode = ref(false)
+const showDesktopDropdown = ref(false)
+const showMobileDropdown = ref(false)
+const showSectionMenu = ref(false)
+const panelMode = ref<'tree' | 'details'>('tree')
+const undoStack = ref<string[]>([])
+const redoStack = ref<string[]>([])
+const historyLocked = ref(false)
+const uploadError = ref('')
+
+const defaultBanner = 'https://aws-assets.kiwify.com.br/Qlf7xYHJBhIz7k6/img_0_Design-sem-nome_c4f6eff966f84e6aa1cc65d4b63d7e3a.png'
+const defaultFigurinhasModuleImage = 'https://aws-assets.kiwify.com.br/Qlf7xYHJBhIz7k6/Mobile-1_e271e950cb2c496e913cd05907b971e0.png'
+const isFigurinhasEditor = computed(() => membersAreaId.value === '1cbe33c8-14d3-4612-81e4-b52587203765' || membersAreaId.value === 'c6d46bd7-9ced-4fb2-a4a0-ae033e3b612a' || /figurinhas|copa 2026/i.test(areaName.value))
+const safeEditorImage = (value = '', fallback = defaultBanner) => {
+  if (!isFigurinhasEditor.value) return value || fallback
+  if (/^(data:image|blob:)/i.test(value) || /member-area-covers/i.test(value)) return value
+  if (/robo|rob[oô]|lightroom|presets|ribas/i.test(value)) return fallback
+  if (fallback === defaultFigurinhasModuleImage) return defaultFigurinhasModuleImage
+  return value || defaultBanner
 }
-const hydrateCustomization = () => {
-  Object.assign(customization, {
-    ...customization,
-    ...(membersArea.value?.customization || {}),
-    heroTitle: membersArea.value?.customization?.heroTitle || areaName.value,
-    bannerUrl: membersArea.value?.customization?.bannerUrl || coverUrl.value
+
+const createState = (): EditorState => ({
+  theme: {
+    primaryColor: '#4f46e5',
+    sidebarColor: '#facc15',
+    backgroundColor: '#080808',
+    textColor: '#ffffff'
+  },
+  sidebar: {
+    logoUrl: '',
+    brandName: 'RETRATISTAS DIGITAIS',
+    title: areaName.value,
+    collapsed: false,
+    links: {
+      home: 'Home',
+      instagram: 'Instagram',
+      support: 'Suporte',
+      instagramUrl: 'https://instagram.com',
+      supportUrl: 'mailto:suporte@ayrtonborgesonline.com'
+    }
+  },
+  home: {
+    banner: {
+      title: areaName.value,
+      imageUrl: safeEditorImage(coverUrl.value, defaultBanner),
+      visible: true
+    },
+    slides: [
+      { id: 'slide-1', title: 'Slide', imageUrl: safeEditorImage(coverUrl.value, defaultBanner) }
+    ],
+    sections: [
+      { id: 'modules', type: 'modules', title: 'Uma seção pode conter módulos', subtitle: 'Uma seção pode conter módulos, cursos e aulas.', imageUrl: safeEditorImage(coverUrl.value, defaultFigurinhasModuleImage), visible: true }
+    ]
+  },
+  menu: {},
+  login: {},
+  settings: {}
+})
+
+const editor = reactive<EditorState>(createState())
+
+const cloneState = (value: EditorState = editor) => JSON.parse(JSON.stringify(value)) as EditorState
+
+const normalizeCustomization = (customization: MembersAreaCustomization = {}): EditorState => {
+  const base = createState()
+  const theme = {
+    ...base.theme,
+    ...(customization.theme || {}),
+    primaryColor: customization.theme?.primaryColor || customization.primaryColor || base.theme.primaryColor,
+    sidebarColor: customization.theme?.sidebarColor || customization.sidebarColor || base.theme.sidebarColor,
+    backgroundColor: customization.theme?.backgroundColor || customization.backgroundColor || base.theme.backgroundColor,
+    textColor: customization.theme?.textColor || customization.textColor || base.theme.textColor
+  }
+  const sidebarLinks = {
+    ...base.sidebar.links,
+    ...(customization.sidebar?.links || {}),
+    home: customization.sidebar?.links?.home || customization.homeLabel || base.sidebar.links.home,
+    instagram: customization.sidebar?.links?.instagram || customization.instagramLabel || base.sidebar.links.instagram,
+    support: customization.sidebar?.links?.support || customization.supportLabel || base.sidebar.links.support
+  }
+  const sidebar = {
+    ...base.sidebar,
+    ...(customization.sidebar || {}),
+    logoUrl: customization.sidebar?.logoUrl || customization.logoUrl || base.sidebar.logoUrl,
+    brandName: customization.sidebar?.brandName || customization.brandName || base.sidebar.brandName,
+    title: customization.sidebar?.title || customization.heroTitle || base.sidebar.title,
+    links: sidebarLinks
+  }
+  const sections = (customization.home?.sections?.length ? customization.home.sections : base.home.sections).map((section) => ({
+    id: section.id,
+    type: section.type || 'custom',
+    title: section.title || 'Nova seção',
+    subtitle: section.subtitle || '',
+    imageUrl: safeEditorImage(section.imageUrl || customization.bannerUrl || coverUrl.value, section.type === 'modules' ? defaultFigurinhasModuleImage : defaultBanner),
+    visible: section.visible !== false
+  }))
+  const home = {
+    ...base.home,
+    ...(customization.home || {}),
+    banner: {
+      ...base.home.banner,
+      ...(customization.home?.banner || {}),
+      title: customization.home?.banner?.title || customization.heroTitle || base.home.banner.title,
+      imageUrl: safeEditorImage(customization.home?.banner?.imageUrl || customization.bannerUrl || coverUrl.value, defaultBanner),
+      visible: customization.home?.banner?.visible ?? (customization.visibleSections ? customization.visibleSections.includes('banner') : true)
+    },
+    slides: (customization.home?.slides?.length ? customization.home.slides : base.home.slides).map((slide, index) => ({
+      id: slide.id || `slide-${index + 1}`,
+      title: slide.title || `Slide ${index + 1}`,
+      imageUrl: safeEditorImage(slide.imageUrl || customization.bannerUrl || coverUrl.value, defaultBanner)
+    })),
+    sections
+  }
+
+  return {
+    theme,
+    sidebar,
+    home,
+    menu: customization.menu || {},
+    login: customization.login || {},
+    settings: customization.settings || {}
+  }
+}
+
+const serializeForSave = (): MembersAreaCustomization => ({
+  theme: cloneState().theme,
+  sidebar: cloneState().sidebar,
+  home: cloneState().home,
+  menu: cloneState().menu,
+  login: cloneState().login,
+  settings: cloneState().settings,
+  primaryColor: editor.theme.primaryColor,
+  sidebarColor: editor.theme.sidebarColor,
+  backgroundColor: editor.theme.backgroundColor,
+  textColor: editor.theme.textColor,
+  logoUrl: editor.sidebar.logoUrl,
+  bannerUrl: editor.home.banner.imageUrl,
+  brandName: editor.sidebar.brandName,
+  homeLabel: editor.sidebar.links.home,
+  instagramLabel: editor.sidebar.links.instagram,
+  supportLabel: editor.sidebar.links.support,
+  heroTitle: editor.home.banner.title,
+  modulesTitle: editor.home.sections.find((section) => section.type === 'modules')?.title || '',
+  visibleSections: [
+    ...(editor.home.banner.visible ? ['banner'] : []),
+    ...editor.home.sections.filter((section) => section.visible).map((section) => section.type)
+  ]
+})
+
+const hydrate = () => {
+  historyLocked.value = true
+  Object.assign(editor, normalizeCustomization(membersArea.value?.customization || {}))
+  undoStack.value = []
+  redoStack.value = []
+  historyLocked.value = false
+}
+
+const pushHistory = () => {
+  if (historyLocked.value) return
+  undoStack.value.push(JSON.stringify(cloneState()))
+  if (undoStack.value.length > 30) undoStack.value.shift()
+  redoStack.value = []
+}
+
+const applyState = (state: EditorState) => {
+  historyLocked.value = true
+  Object.assign(editor, state)
+  historyLocked.value = false
+}
+
+const mutate = (callback: () => void) => {
+  pushHistory()
+  callback()
+}
+
+const undo = () => {
+  const previous = undoStack.value.pop()
+  if (!previous) return
+  redoStack.value.push(JSON.stringify(cloneState()))
+  applyState(JSON.parse(previous))
+}
+
+const redo = () => {
+  const next = redoStack.value.pop()
+  if (!next) return
+  undoStack.value.push(JSON.stringify(cloneState()))
+  applyState(JSON.parse(next))
+}
+
+const selectItem = (id: string) => {
+  selectedItem.value = id
+  panelMode.value = 'details'
+}
+
+const addSlide = () => {
+  if (editor.home.slides.length >= 3) return
+  mutate(() => {
+    const next = editor.home.slides.length + 1
+    const slide = { id: `slide-${Date.now()}`, title: `Slide ${next}`, imageUrl: editor.home.banner.imageUrl }
+    editor.home.slides.push(slide)
+    selectedItem.value = slide.id
   })
 }
+
+const removeSlide = (id: string) => {
+  if (editor.home.slides.length <= 1) return
+  mutate(() => {
+    editor.home.slides = editor.home.slides.filter((slide) => slide.id !== id)
+    selectedItem.value = 'banner'
+  })
+}
+
+const addSection = (type = 'custom') => {
+  mutate(() => {
+    const section = {
+      id: `section-${Date.now()}`,
+      type,
+      title: type === 'modules' ? 'Módulos' : 'Nova seção',
+      subtitle: '',
+      imageUrl: editor.home.banner.imageUrl,
+      visible: true
+    }
+    editor.home.sections.push(section)
+    selectedItem.value = section.id
+  })
+}
+
+const removeSection = (id: string) => {
+  if (editor.home.sections.length <= 1) return
+  mutate(() => {
+    editor.home.sections = editor.home.sections.filter((section) => section.id !== id)
+    selectedItem.value = 'banner'
+  })
+}
+
+const duplicateSection = (section: EditorSection) => {
+  mutate(() => {
+    const copy = { ...section, id: `section-${Date.now()}`, title: `${section.title} cópia` }
+    editor.home.sections.push(copy)
+    selectedItem.value = copy.id
+  })
+}
+
+const moveSection = (id: string, direction: -1 | 1) => {
+  const index = editor.home.sections.findIndex((section) => section.id === id)
+  const target = index + direction
+  if (index < 0 || target < 0 || target >= editor.home.sections.length) return
+  mutate(() => {
+    const [section] = editor.home.sections.splice(index, 1)
+    editor.home.sections.splice(target, 0, section)
+  })
+}
+
+const selectedSlide = computed(() => editor.home.slides.find((slide) => slide.id === selectedItem.value))
+const selectedSection = computed(() => editor.home.sections.find((section) => section.id === selectedItem.value))
+const selectedKind = computed(() => selectedItem.value === 'banner' ? 'banner' : selectedSlide.value ? 'slide' : selectedSection.value ? 'section' : 'general')
+const activeBannerImage = computed(() => editor.home.banner.imageUrl || editor.home.slides[0]?.imageUrl)
+const activePanelTitle = computed(() => {
+  if (selectedKind.value === 'banner') return 'Banner'
+  if (selectedKind.value === 'slide') return selectedSlide.value?.title || 'Slide'
+  if (selectedKind.value === 'section') return selectedSection.value?.title || 'Módulos'
+  if (activeTab.value === 'menu') return 'Menu'
+  if (activeTab.value === 'login') return 'Login'
+  if (activeTab.value === 'settings') return 'Configurações'
+  return 'Início'
+})
+
+const setTab = (tab: 'home' | 'menu' | 'login' | 'settings') => {
+  activeTab.value = tab
+  selectedItem.value = tab === 'home' ? 'banner' : tab
+  panelMode.value = tab === 'home' ? 'tree' : 'details'
+  showDesktopDropdown.value = false
+  showMobileDropdown.value = false
+}
+
+const updateEditor = (callback: () => void) => mutate(callback)
+
+const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+  const reader = new FileReader()
+  reader.onload = () => resolve(String(reader.result || ''))
+  reader.onerror = () => reject(reader.error)
+  reader.readAsDataURL(file)
+})
+
+const setImageValue = (target: 'banner' | 'slide' | 'section', imageUrl: string) => {
+  mutate(() => {
+    if (target === 'banner') {
+      editor.home.banner.imageUrl = imageUrl
+      editor.home.slides[0].imageUrl = imageUrl
+      return
+    }
+    if (target === 'slide' && selectedSlide.value) {
+      selectedSlide.value.imageUrl = imageUrl
+      return
+    }
+    if (target === 'section' && selectedSection.value) {
+      selectedSection.value.imageUrl = imageUrl
+    }
+  })
+}
+
+const handleImageUpload = async (event: Event | DragEvent, target: 'banner' | 'slide' | 'section') => {
+  event.preventDefault()
+  uploadError.value = ''
+  const input = event.target as HTMLInputElement
+  const dropped = 'dataTransfer' in event ? event.dataTransfer?.files?.[0] : null
+  const file = dropped || input.files?.[0]
+  if (!file) return
+
+  if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type)) {
+    uploadError.value = 'Use JPEG, JPG, PNG ou WEBP.'
+    return
+  }
+
+  if (file.size > 2 * 1024 * 1024) {
+    uploadError.value = 'Imagem deve ter ate 2 MB.'
+    return
+  }
+
+  const extension = file.name.split('.').pop() || 'png'
+  const key = target === 'slide' ? selectedSlide.value?.id : target === 'section' ? selectedSection.value?.id : 'banner'
+  const uploaded = await uploadFile('member-area-covers', `${membersAreaId.value}/${target}-${key || Date.now()}.${extension}`, file)
+  const imageUrl = uploaded.data?.publicUrl || await readFileAsDataUrl(file)
+  setImageValue(target, imageUrl)
+  if (input?.value !== undefined) input.value = ''
+}
+
+const clearImage = (target: 'banner' | 'slide' | 'section') => {
+  setImageValue(target, '')
+}
+
 const saveCustomization = async () => {
   saving.value = true
   try {
-    await saveMembersAreaCustomization(membersAreaId.value, { ...customization })
+    await saveMembersAreaCustomization(membersAreaId.value, serializeForSave())
   } finally {
     saving.value = false
   }
 }
 
-watch(membersArea, hydrateCustomization, { immediate: true })
+watch(membersArea, hydrate, { immediate: true })
 </script>
 
 <template>
-  <div class="min-h-screen bg-white text-gray-900 editor-shell">
-    <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
-      <div class="flex items-center min-w-0 gap-5">
-        <NuxtLink :to="areaPath" class="text-gray-600 hover:text-gray-900">
-          <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+  <main>
+    <div class="members-area-editor sidebar-open" style="--navbar-size: 56px; --scrollbar-width: 0px;">
+      <nav class="navbar flex items-center py-2 border-b sticky top-0 left-0 right-0 z-20 bg-white">
+        <NuxtLink :to="areaPath" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-600 bg-transparent focus-visible:bg-gray-100 hover:bg-gray-100 border border-transparent leading-5 text-sm p-2 gap-2 cursor-pointer" aria-label="Voltar">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="24px" height="24px" class="h-5 w-5"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd"></path></svg>
         </NuxtLink>
-        <span class="truncate text-base font-medium text-gray-700">{{ areaName }}</span>
-      </div>
-
-      <nav class="hidden lg:flex items-center h-full text-gray-600">
-        <button type="button" class="h-10 px-4 rounded-md border border-indigo-500 text-indigo-600 bg-indigo-50 flex items-center gap-2 font-medium">
-          <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7A1 1 0 003 11h1v5a1 1 0 001 1h3v-4h4v4h3a1 1 0 001-1v-5h1a1 1 0 00.707-1.707l-7-7z"></path></svg>
-          Início
-        </button>
-        <button type="button" class="h-10 px-4 flex items-center gap-2 font-medium">
-          <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm1 4a1 1 0 100 2h12a1 1 0 100-2H4z" clip-rule="evenodd"></path></svg>
-          Menu
-        </button>
-        <button type="button" class="h-10 px-4 flex items-center gap-2 font-medium">
-          <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM16.5 7.5a1 1 0 00-1 1V10H14a1 1 0 100 2h1.5v1.5a1 1 0 102 0V12H19a1 1 0 100-2h-1.5V8.5a1 1 0 00-1-1z"></path></svg>
-          Login
-        </button>
-        <button type="button" class="h-10 px-4 flex items-center gap-2 font-medium">
-          <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.53 1.53 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106a1.53 1.53 0 01-.947 2.287c-1.561.379-1.561 2.6 0 2.978a1.53 1.53 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.53 1.53 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.53 1.53 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.53 1.53 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.53 1.53 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.53 1.53 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"></path></svg>
-          Configurações
-        </button>
+        <span class="p-2 block truncate text-sm text-gray-600 font-medium">{{ areaName }}</span>
+        <div class="flex items-center gap-2 ml-auto">
+          <button v-for="tab in [{ id: 'home', icon: 'fa-home', label: 'Início' }, { id: 'menu', icon: 'fa-bars', label: 'Menu' }, { id: 'login', icon: 'fa-door-open', label: 'Login' }, { id: 'settings', icon: 'fa-cog', label: 'Configurações' }]" :key="tab.id" type="button" :class="activeTab === tab.id ? 'inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-indigo-800 bg-indigo-50 focus-visible:bg-indigo-100 hover:bg-indigo-100 border border-indigo-500 leading-5 text-sm py-2 px-2.5 gap-2 cursor-pointer' : 'inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-600 bg-transparent focus-visible:bg-gray-100 hover:bg-gray-100 border border-transparent leading-5 text-sm py-2 px-2.5 gap-2 cursor-pointer'" @click="setTab(tab.id as any)">
+            <span aria-hidden="true" class="kiwi-icon-fa inline-block leading-0 text-center"><i :class="`fa ${tab.icon}`" style="font-size: 14px; height: 14px; min-width: 14px;"></i></span>
+            {{ tab.label }}
+          </button>
+          <hr class="bg-gray-200 w-px h-auto self-stretch">
+          <div class="flex items-center gap-0.5">
+            <button type="button" :disabled="!undoStack.length" :class="!undoStack.length ? 'w-9.5 h-9.5 inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-600 bg-transparent focus-visible:bg-gray-100 hover:bg-gray-100 border border-transparent leading-4 text-sm p-3 gap-2 opacity-50 cursor-not-allowed' : 'w-9.5 h-9.5 inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-600 bg-transparent focus-visible:bg-gray-100 hover:bg-gray-100 border border-transparent leading-4 text-sm p-3 gap-2 cursor-pointer'" id="ce__action__undo" aria-expanded="false" @click="undo"><span aria-hidden="true" class="kiwi-icon-fa inline-block leading-0 text-center"><i class="fas fa-undo" style="font-size: 12px; height: 12px; min-width: 12px;"></i></span></button>
+            <button type="button" :disabled="!redoStack.length" :class="!redoStack.length ? 'w-9.5 h-9.5 inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-600 bg-transparent focus-visible:bg-gray-100 hover:bg-gray-100 border border-transparent leading-4 text-sm p-3 gap-2 opacity-50 cursor-not-allowed' : 'w-9.5 h-9.5 inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-600 bg-transparent focus-visible:bg-gray-100 hover:bg-gray-100 border border-transparent leading-4 text-sm p-3 gap-2 cursor-pointer'" id="ce__action__redo" aria-expanded="false" @click="redo"><span aria-hidden="true" class="kiwi-icon-fa inline-block leading-0 text-center"><i class="fas fa-redo" style="font-size: 12px; height: 12px; min-width: 12px;"></i></span></button>
+          </div>
+          <hr class="bg-gray-200 w-px h-auto self-stretch">
+          <div class="flex items-center gap-0.5">
+            <button type="button" class="w-9.5 h-9.5 inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-600 bg-transparent focus-visible:bg-gray-100 hover:bg-gray-100 border border-transparent leading-5 text-sm p-2.5 gap-2 cursor-pointer p-2 rounded-md border border-transparent outline-none focus:outline-none" aria-expanded="false" @click="showCode = !showCode">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="24px" height="24px" class="h-5 w-5"><path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+            </button>
+          </div>
+          <hr class="bg-gray-200 w-px h-auto self-stretch">
+          <div class="flex relative" iconsize="16">
+            <button type="button" :class="previewMode === 'desktop' ? 'w-9.5 h-9.5 rounded-r-none inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-indigo-800 bg-indigo-50 focus-visible:bg-indigo-100 hover:bg-indigo-100 border border-indigo-500 leading-4 text-sm p-2.5 gap-2 cursor-pointer' : 'w-9.5 h-9.5 rounded-r-none inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-600 bg-transparent focus-visible:bg-gray-100 hover:bg-gray-100 border border-transparent leading-4 text-sm p-2.5 gap-2 cursor-pointer'" id="ce__viewport__web" aria-expanded="false" @click="previewMode = 'desktop'"><span aria-hidden="true" class="kiwi-icon-fa inline-block leading-0 text-center"><i class="fa fa-desktop" style="font-size: 16px; height: 16px; min-width: 16px;"></i></span></button>
+            <button type="button" :class="previewMode === 'desktop' ? 'border-l-0 rounded-l-none inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-indigo-800 bg-indigo-50 focus-visible:bg-indigo-100 hover:bg-indigo-100 border border-indigo-500 leading-4 text-sm px-1 gap-2 cursor-pointer' : 'border-l-0 rounded-l-none inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-600 bg-transparent focus-visible:bg-gray-100 hover:bg-gray-100 border border-transparent leading-4 text-sm px-1 gap-2 cursor-pointer'" id="ce__viewport__web__dropdown" aria-haspopup="true" :aria-expanded="showDesktopDropdown" @click="showDesktopDropdown = !showDesktopDropdown; showMobileDropdown = false"><span aria-hidden="true" class="kiwi-icon-fa inline-block leading-0 text-center"><i class="fa fa-angle-down" style="font-size: 12px; height: 12px; min-width: 12px;"></i></span></button>
+            <div class="ce-dropdown absolute bg-white shadow-md rounded-md p-3 z-10 end" :style="{ display: showDesktopDropdown ? 'block' : 'none' }">
+              <label class="block cursor-pointer px-2 py-1 rounded-sm text-sm font-medium focus-within:bg-gray-200 hover:bg-gray-200" :class="{ 'bg-gray-100': previewMode === 'desktop' }">
+                <input type="radio" name="viewport" class="sr-only" value="desktop" :checked="previewMode === 'desktop'" @change="previewMode = 'desktop'; showDesktopDropdown = false">
+                <span class="text-sm font-medium">Desktop</span>
+              </label>
+              <label class="block cursor-pointer px-2 py-1 rounded-sm text-sm font-medium focus-within:bg-gray-200 hover:bg-gray-200" :class="{ 'bg-gray-100': previewMode === 'mobile' }">
+                <input type="radio" name="viewport" class="sr-only" value="mobile" :checked="previewMode === 'mobile'" @change="previewMode = 'mobile'; showDesktopDropdown = false">
+                <span class="text-sm font-medium">Mobile</span>
+              </label>
+            </div>
+          </div>
+          <div class="flex relative" iconsize="16">
+            <button type="button" :class="previewMode === 'mobile' ? 'w-9.5 h-9.5 rounded-r-none inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-indigo-800 bg-indigo-50 focus-visible:bg-indigo-100 hover:bg-indigo-100 border border-indigo-500 leading-4 text-sm p-2.5 gap-2 cursor-pointer' : 'w-9.5 h-9.5 rounded-r-none inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-600 bg-transparent focus-visible:bg-gray-100 hover:bg-gray-100 border border-transparent leading-4 text-sm p-2.5 gap-2 cursor-pointer'" id="ce__viewport__mobile_app" aria-expanded="false" @click="previewMode = 'mobile'"><span aria-hidden="true" class="kiwi-icon-fa inline-block leading-0 text-center"><i class="fa fa-mobile-alt" style="font-size: 16px; height: 16px; min-width: 16px;"></i></span></button>
+            <button type="button" class="border-l-0 rounded-l-none inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-600 bg-transparent focus-visible:bg-gray-100 hover:bg-gray-100 border border-transparent leading-4 text-sm px-1 gap-2 cursor-pointer" id="ce__viewport__mobile_app__dropdown" aria-haspopup="true" :aria-expanded="showMobileDropdown" @click="showMobileDropdown = !showMobileDropdown; showDesktopDropdown = false"><span aria-hidden="true" class="kiwi-icon-fa inline-block leading-0 text-center"><i class="fa fa-angle-down" style="font-size: 12px; height: 12px; min-width: 12px;"></i></span></button>
+            <div class="ce-dropdown absolute bg-white shadow-md rounded-md p-3 z-10 end" :style="{ display: showMobileDropdown ? 'block' : 'none' }">
+              <div>
+                <div class="v-portal" style="display: none;"></div>
+                <div class="flex items-center">
+                  <span role="checkbox" tabindex="0" aria-checked="true" class="bg-gray-200 relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:shadow-outline bg-indigo-500">
+                    <span aria-hidden="true" class="inline-block h-5 w-5 rounded-full bg-white shadow transform transition ease-in-out duration-200 translate-x-5"></span>
+                  </span>
+                  <label class="block text-sm font-medium leading-5 text-gray-700 ml-2 cursor-pointer">Sincronizar com a versão web</label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <hr class="bg-gray-200 w-px h-auto self-stretch">
+          <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 border-transparent focus:border-indigo-700 focus:shadow-outline-indigo leading-5 text-sm py-2 px-8 gap-2 cursor-pointer shadow-sm" :disabled="saving" @click="saveCustomization">{{ saving ? 'Salvando...' : 'Salvar' }}</button>
+        </div>
       </nav>
 
-      <div class="flex items-center gap-4">
-        <div class="hidden md:flex items-center border-l border-gray-200 pl-4 gap-3 text-gray-500">
-          <button type="button" class="p-2"><svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a5 5 0 015 5v2M3 10l5-5M3 10l5 5"></path></svg></button>
-          <button type="button" class="p-2 text-gray-300"><svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10H11a5 5 0 00-5 5v2m15-7l-5-5m5 5l-5 5"></path></svg></button>
-          <button type="button" class="p-2 border-l border-gray-200 pl-5">&lt;/&gt;</button>
+      <div class="flash--wrapper"><span></span></div>
+      <div class="page-content relative bg-gray-200 transition-all duration-300">
+        <div class="phone-container" :class="{ 'phone-enabled': previewMode === 'mobile' }">
+          <div class="phone-device" :class="{ 'phone-frame-active': previewMode === 'mobile' }">
+            <div v-if="previewMode === 'mobile'" class="volume-buttons"><div class="volume-up"></div><div class="volume-down"></div></div>
+            <div v-if="previewMode === 'mobile'" class="power-button"></div>
+            <div :class="previewMode === 'mobile' ? 'phone-frame' : 'screen'">
+              <div v-if="previewMode === 'mobile'" class="dynamic-island"><div class="island-speaker"></div><div class="island-camera"></div></div>
+              <iframe :src="publicClubPath" class="mx-auto w-full h-full transition-all duration-300 2xl:border 2xl:shadow-lg 2xl:rounded-lg max-w-full"></iframe>
+              <div v-if="previewMode === 'mobile'" class="home-indicator"></div>
+            </div>
+          </div>
         </div>
-        <div class="hidden xl:flex items-center gap-2">
-          <button type="button" class="h-10 w-12 rounded-l-md border border-indigo-500 bg-indigo-50 text-indigo-600 flex items-center justify-center">
-            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20h6l-.75-3M4 4h16v12H4z"></path></svg>
-          </button>
-          <button type="button" class="h-10 w-12 border border-gray-200 text-gray-600 flex items-center justify-center">
-            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 2h8a1 1 0 011 1v18a1 1 0 01-1 1H8a1 1 0 01-1-1V3a1 1 0 011-1z"></path></svg>
-          </button>
-        </div>
-        <button type="button" class="h-10 px-8 rounded-md bg-indigo-600 text-white font-medium shadow-sm" :disabled="saving" @click="saveCustomization">{{ saving ? 'Salvando...' : 'Salvar' }}</button>
       </div>
-    </header>
 
-    <main class="flex h-[calc(100vh-4rem)] overflow-hidden">
-      <aside class="w-64 flex-none border-r-2 border-emerald-500 flex flex-col text-gray-950" :style="{ backgroundColor: customization.sidebarColor }">
-        <div class="relative h-36 flex items-center justify-center border-b border-yellow-600/40 px-8">
-          <img v-if="customization.logoUrl" :src="customization.logoUrl" alt="" class="h-14 max-w-40 object-contain mb-4">
-          <h1 class="text-2xl leading-tight text-center">{{ customization.heroTitle || areaName }}</h1>
-          <button type="button" class="absolute right-4 top-5 text-gray-900">
-            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-          </button>
-        </div>
-        <nav class="py-6 space-y-2 text-lg">
-          <a class="flex items-center gap-4 px-6 py-3 font-medium" href="#">
-            <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7A1 1 0 003 11h1v5a1 1 0 001 1h3v-4h4v4h3a1 1 0 001-1v-5h1a1 1 0 00.707-1.707l-7-7z"></path></svg>
-            {{ customization.homeLabel }}
-          </a>
-          <a class="flex items-center gap-4 px-6 py-3 font-medium" href="#">
-            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect width="16" height="16" x="4" y="4" rx="4" stroke-width="2"></rect><path stroke-linecap="round" stroke-width="2" d="M16.5 7.5h.01"></path><circle cx="12" cy="12" r="3.5" stroke-width="2"></circle></svg>
-            {{ customization.instagramLabel }}
-          </a>
-          <a class="flex items-center gap-4 px-6 py-3 font-medium" href="#">
-            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 10a6 6 0 00-12 0v5a3 3 0 003 3h1v-6H7v-2a5 5 0 0110 0v2h-3v6h1a3 3 0 003-3v-5z"></path></svg>
-            {{ customization.supportLabel }}
-          </a>
-        </nav>
-        <div class="mt-auto border-t border-yellow-600/40 p-4 flex items-center gap-3">
-          <div class="h-12 w-12 rounded-full bg-white flex items-center justify-center text-gray-500">RD</div>
-          <div class="font-medium truncate">{{ customization.brandName }}</div>
-          <svg class="h-5 w-5 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path></svg>
-        </div>
-      </aside>
-
-      <section class="flex-1 overflow-auto relative" :style="{ backgroundColor: customization.backgroundColor, color: customization.textColor }">
-        <div v-if="hasSection('banner')" class="relative border-2 border-emerald-500 border-l-0">
-          <div class="absolute left-0 top-1/2 -translate-y-1/2 h-10 w-10 bg-emerald-500 text-white flex items-center justify-center z-10">
-            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7 7 7M12 3v18"></path></svg>
-          </div>
-          <div class="h-80 bg-gradient-to-r from-cyan-400 via-teal-300 to-yellow-300 flex items-center justify-center overflow-hidden">
-            <img v-if="activeBannerUrl" :src="activeBannerUrl" alt="" class="h-full w-full object-cover">
-            <div v-else class="text-center">
-              <div class="text-6xl font-black text-blue-800">FIGURINHAS DA</div>
-              <div class="text-7xl font-black text-yellow-300 drop-shadow">COPA 2026</div>
+      <section role="dialog" aria-modal="true" aria-labelledby="slide-over-title" class="ce-sidebar w-24rem bg-white border-l fixed right-0 bottom-0 z-10 flex flex-row overflow-hidden" style="">
+        <section class="ce-elements-tree w-full absolute inset-0 transform transition-transform duration-200 ease-in-out overflow-y-auto" :class="panelMode === 'tree' ? 'translate-x-0' : '-translate-x-full'" :aria-hidden="panelMode !== 'tree'">
+          <h2 id="slide-over-title" class="flex items-center text-lg font-medium text-gray-900 bg-gray-50 border-b py-2 px-4">{{ activeTab === 'home' ? 'Início' : activeTab === 'menu' ? 'Menu' : activeTab === 'login' ? 'Login' : 'Configurações' }}</h2>
+          <article class="relative py-2 px-1.5">
+            <header class="py-2 px-4 -mx-1.5"><h3 id="slide-over-elements-title" class="block text-sm font-medium leading-5 text-gray-700">Seções</h3></header>
+            <ul class="ce-elements-tree py-1 px-0.5 space-y-0.5 rounded-md border border-dashed border-transparent">
+              <li id="section-M7IADU" aria-level="1" aria-setsize="2" aria-posinset="1" aria-expanded="true" role="treeitem" class="relative">
+                <div class="ce-elements-tree__item group relative w-full flex items-center justify-between gap-1 text-left py-1 px-1.5 rounded-md text-gray-600">
+                  <button type="button" tabindex="0" class="ce-elements-tree__item__button absolute inset-0 rounded-md text-left py-1 flex flex-row items-center gap-1 focus:bg-gray-200 focus:outline-none pl-8 pr-15" @click="selectItem('banner')"><span class="relative text-center w-6"><span aria-hidden="true" class="kiwi-icon-fa inline-block leading-0 text-center ce-elements-tree__item__button__icon transition-opacity duration-200 opacity-100"><i class="fas fa-images" style="font-size: 16px; height: 16px; min-width: 16px;"></i></span><span aria-hidden="true" class="kiwi-icon-fa inline-block leading-0 text-center w-6 h-6 ce-elements-tree__item__button__icon-drag cursor-move transform absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 flex items-center justify-center rounded-md bg-transparent focus:bg-gray-200 hover:bg-gray-200 transition-opacity duration-200 opacity-0" title="Arraste e solte para reordenar"><i class="fas fa-grip-vertical" style="font-size: 13px; height: 13px; min-width: 13px;"></i></span></span><span class="ce-elements-tree__item__label flex-1 min-w-0 select-none leading-4 text-sm truncate">Banner</span></button>
+                  <span class="ce-elements-tree__item__toggle relative z-10 h-6 text-left"><button type="button" tabindex="0" aria-expanded="true" aria-controls="section__M7IADU__blocks" title="Minimizar" class="ce-elements-tree__item__toggle__button w-6 h-6 flex items-center justify-center rounded-md text-gray-500 bg-transparent hover:bg-gray-200 focus:outline-none"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="24px" height="24px" class="ce-elements-tree__item__toggle__button__icon w-5 h-5 flex items-center justify-center transform transition-transform duration-200 rotate-90"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path></svg></button></span>
+                  <span class="ce-elements-tree__item__actions relative ml-auto z-10 h-6 text-right opacity-0 transition-opacity duration-200"><button type="button" tabindex="0" title="Duplicar" class="ce-elements-tree__item__actions__button w-6 h-6 flex items-center justify-center rounded-md transition-all duration-200 bg-transparent focus:bg-gray-200 hover:bg-gray-200 focus:outline-none"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24px" height="24px" class="w-4 h-4 flex items-center justify-center"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button></span>
+                  <span class="ce-elements-tree__item__actions relative z-10 h-6 text-right opacity-0 transition-opacity duration-200"><button type="button" tabindex="0" title="Excluir" class="ce-elements-tree__item__actions__button w-6 h-6 flex items-center justify-center rounded-md transition-all duration-200 bg-transparent focus:bg-gray-200 hover:bg-gray-200 focus:outline-none"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24px" height="24px" class="w-4 h-4 flex items-center justify-center"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button></span>
+                </div>
+                <div id="section__M7IADU__blocks" class="ce-elements-tree-wrapper pl-14 pb-1">
+                  <ul class="ce-elements-tree rounded-md border border-dashed border-transparent">
+                    <li v-for="slide in editor.home.slides" :key="slide.id" :id="`section-M7IADU-block-${slide.id}`" aria-level="2" :aria-setsize="editor.home.slides.length" role="treeitem" class="relative">
+                      <div class="ce-elements-tree__item group relative w-full flex items-center justify-between gap-1 text-left py-1 px-1.5 rounded-md text-gray-600">
+                        <button type="button" tabindex="0" class="ce-elements-tree__item__button absolute inset-0 rounded-md text-left py-1 flex flex-row items-center gap-1 focus:bg-gray-200 focus:outline-none pl-1.5 pr-15" @click="selectItem(slide.id)"><span class="relative text-center w-6"><span aria-hidden="true" class="kiwi-icon-fa inline-block leading-0 text-center ce-elements-tree__item__button__icon"><i class="fas fa-image" style="font-size: 16px; height: 16px; min-width: 16px;"></i></span></span><span class="ce-elements-tree__item__label flex-1 min-w-0 select-none leading-4 text-sm truncate">{{ slide.title || 'Slide' }} – <i class="text-gray-500">Slide de imagem</i></span></button>
+                        <span class="ce-elements-tree__item__toggle-empty-spacer"></span>
+                        <span class="ce-elements-tree__item__actions relative ml-auto z-10 h-6 text-right opacity-0 transition-opacity duration-200"><button type="button" tabindex="0" title="Duplicar" class="ce-elements-tree__item__actions__button w-6 h-6 flex items-center justify-center rounded-md transition-all duration-200 bg-transparent focus:bg-gray-200 hover:bg-gray-200 focus:outline-none"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24px" height="24px" class="w-4 h-4 flex items-center justify-center"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button></span>
+                        <span class="ce-elements-tree__item__actions relative z-10 h-6 text-right opacity-0 transition-opacity duration-200"><button type="button" :disabled="editor.home.slides.length <= 1" tabindex="-1" title="Não é possível excluir todos os blocos" :class="editor.home.slides.length <= 1 ? 'ce-elements-tree__item__actions__button w-6 h-6 flex items-center justify-center rounded-md transition-all duration-200 text-gray-400 focus:outline-none' : 'ce-elements-tree__item__actions__button w-6 h-6 flex items-center justify-center rounded-md transition-all duration-200 bg-transparent focus:bg-gray-200 hover:bg-gray-200 focus:outline-none'" @click="removeSlide(slide.id)"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24px" height="24px" class="w-4 h-4 flex items-center justify-center"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button></span>
+                      </div>
+                    </li>
+                  </ul>
+                  <div class="px-px"><button type="button" tabindex="0" title="" class="ce-elements-tree__add-button w-full flex items-center justify-between gap-0.5 text-left py-1 px-1.5 focus:outline-none rounded-md border-2 border-transparent text-blue-600 bg-transparent hover:bg-gray-100 focus:bg-gray-200" :disabled="editor.home.slides.length >= 3" @click="addSlide"><span class="ce-elements-tree__add-button__icon text-center w-6 leading-0 pr-0.5"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24px" height="24px" class="w-5 h-5 inline-block"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span><span class="ce-elements-tree__add-button__label flex-1 min-w-0 select-none leading-4 text-sm truncate">Adicionar slide ({{ editor.home.slides.length }}/3)</span></button></div>
+                </div>
+              </li>
+              <li v-for="(section, index) in editor.home.sections" :key="section.id" :id="`section-${section.id}`" aria-level="1" :aria-setsize="editor.home.sections.length + 1" :aria-posinset="index + 2" role="treeitem" class="relative">
+                <div class="ce-elements-tree__item group relative w-full flex items-center justify-between gap-1 text-left py-1 px-1.5 rounded-md text-gray-600">
+                  <button type="button" tabindex="0" class="ce-elements-tree__item__button absolute inset-0 rounded-md text-left py-1 flex flex-row items-center gap-1 focus:bg-gray-200 focus:outline-none pl-8 pr-15" @click="selectItem(section.id)"><span class="relative text-center w-6"><span aria-hidden="true" class="kiwi-icon-fa inline-block leading-0 text-center ce-elements-tree__item__button__icon transition-opacity duration-200 opacity-100"><i :class="section.type === 'modules' ? 'fas fa-sitemap' : 'fas fa-images'" style="font-size: 16px; height: 16px; min-width: 16px;"></i></span><span aria-hidden="true" class="kiwi-icon-fa inline-block leading-0 text-center w-6 h-6 ce-elements-tree__item__button__icon-drag cursor-move transform absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 flex items-center justify-center rounded-md bg-transparent focus:bg-gray-200 hover:bg-gray-200 transition-opacity duration-200 opacity-0" title="Arraste e solte para reordenar"><i class="fas fa-grip-vertical" style="font-size: 13px; height: 13px; min-width: 13px;"></i></span></span><span class="ce-elements-tree__item__label flex-1 min-w-0 select-none leading-4 text-sm truncate">{{ section.type === 'modules' ? 'Módulos' : section.title }} – <i class="text-gray-500">{{ section.title }}</i></span></button>
+                  <span class="ce-elements-tree__item__toggle relative z-10 h-6 text-left"></span>
+                  <span class="ce-elements-tree__item__actions relative ml-auto z-10 h-6 text-right opacity-0 transition-opacity duration-200"><button type="button" tabindex="0" title="Duplicar" class="ce-elements-tree__item__actions__button w-6 h-6 flex items-center justify-center rounded-md transition-all duration-200 bg-transparent focus:bg-gray-200 hover:bg-gray-200 focus:outline-none" @click="duplicateSection(section)"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24px" height="24px" class="w-4 h-4 flex items-center justify-center"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button></span>
+                  <span class="ce-elements-tree__item__actions relative z-10 h-6 text-right opacity-0 transition-opacity duration-200"><button type="button" tabindex="0" title="Excluir" class="ce-elements-tree__item__actions__button w-6 h-6 flex items-center justify-center rounded-md transition-all duration-200 bg-transparent focus:bg-gray-200 hover:bg-gray-200 focus:outline-none" @click="removeSection(section.id)"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24px" height="24px" class="w-4 h-4 flex items-center justify-center"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button></span>
+                </div>
+              </li>
+            </ul>
+            <div class="px-0.5 border-l border-r border-transparent relative">
+              <button type="button" tabindex="0" title="" class="ce-elements-tree__add-button w-full flex items-center justify-between gap-0.5 text-left py-1 pl-8 pr-1.5 focus:outline-none rounded-md border-2 border-transparent text-blue-600 bg-transparent hover:bg-gray-100 focus:bg-gray-200" @click="showSectionMenu = !showSectionMenu"><span class="ce-elements-tree__add-button__icon text-center w-6 leading-0 pr-0.5"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24px" height="24px" class="w-5 h-5 inline-block"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span><span class="ce-elements-tree__add-button__label flex-1 min-w-0 select-none leading-4 text-sm truncate">Adicionar seção</span></button>
+              <div class="fixed z-50 rounded-md shadow-md bg-white p-2 min-w-260px focus:outline-none" :style="{ display: showSectionMenu ? 'block' : 'none', right: '12px', top: '334px' }" role="menu" tabindex="-1">
+                <div role="menuitem" tabindex="-1" class="flex items-center justify-left gap-2 w-full p-2 hover:bg-gray-100 rounded-md cursor-pointer" @click="addSection('custom'); showSectionMenu = false"><span aria-hidden="true" class="kiwi-icon-fa inline-block leading-0 text-center text-gray-600 w-4 h-4 flex-shrink-0"><i class="fas fa-images" style="font-size: 14px; height: 14px; min-width: 14px;"></i></span><span class="text-base leading-6 sm:text-sm sm:leading-5 flex-1 text-left truncate">Banner</span></div>
+                <div role="menuitem" tabindex="-1" class="flex items-center justify-left gap-2 w-full p-2 hover:bg-gray-100 rounded-md cursor-pointer" @click="addSection('modules'); showSectionMenu = false"><span aria-hidden="true" class="kiwi-icon-fa inline-block leading-0 text-center text-gray-600 w-4 h-4 flex-shrink-0"><i class="fas fa-sitemap" style="font-size: 14px; height: 14px; min-width: 14px;"></i></span><span class="text-base leading-6 sm:text-sm sm:leading-5 flex-1 text-left truncate">Módulos</span></div>
+                <div role="menuitem" tabindex="-1" class="flex items-center justify-left gap-2 w-full p-2 hover:bg-gray-100 rounded-md cursor-pointer" @click="addSection('courses'); showSectionMenu = false"><span aria-hidden="true" class="kiwi-icon-fa inline-block leading-0 text-center text-gray-600 w-4 h-4 flex-shrink-0"><i class="fas fa-graduation-cap" style="font-size: 14px; height: 14px; min-width: 14px;"></i></span><span class="text-base leading-6 sm:text-sm sm:leading-5 flex-1 text-left truncate">Cursos</span></div>
+                <div role="menuitem" tabindex="-1" class="flex items-center justify-left gap-2 w-full p-2 hover:bg-gray-100 rounded-md cursor-pointer" @click="addSection('lessons'); showSectionMenu = false"><span aria-hidden="true" class="kiwi-icon-fa inline-block leading-0 text-center text-gray-600 w-4 h-4 flex-shrink-0"><i class="fas fa-bookmark" style="font-size: 14px; height: 14px; min-width: 14px;"></i></span><span class="text-base leading-6 sm:text-sm sm:leading-5 flex-1 text-left truncate">Aulas</span></div>
+                <div role="menuitem" tabindex="-1" class="flex items-center justify-left gap-2 w-full p-2 hover:bg-gray-100 rounded-md cursor-pointer" @click="addSection('continue'); showSectionMenu = false"><span aria-hidden="true" class="kiwi-icon-fa inline-block leading-0 text-center text-gray-600 w-4 h-4 flex-shrink-0"><i class="fas fa-play-circle" style="font-size: 14px; height: 14px; min-width: 14px;"></i></span><span class="text-base leading-6 sm:text-sm sm:leading-5 flex-1 text-left truncate">Continuar assistindo</span></div>
+              </div>
             </div>
-          </div>
-          <div class="absolute right-0 bottom-0 flex bg-emerald-500 text-white">
-            <button type="button" class="h-10 w-10 flex items-center justify-center">
-              <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.53 1.53 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106a1.53 1.53 0 01-.947 2.287c-1.561.379-1.561 2.6 0 2.978a1.53 1.53 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.53 1.53 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.53 1.53 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.53 1.53 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.53 1.53 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.53 1.53 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"></path></svg>
-            </button>
-            <button type="button" class="h-10 w-10 flex items-center justify-center">
-              <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path d="M7 3a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0016.414 6L14 3.586A2 2 0 0012.586 3H7z"></path><path d="M3 7a2 2 0 012-2v10H3V7z"></path></svg>
-            </button>
-            <button type="button" class="h-10 w-10 flex items-center justify-center">
-              <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
-            </button>
-          </div>
-        </div>
-
-        <div v-if="hasSection('modules')" class="px-16 py-12">
-          <h2 class="text-2xl font-bold text-white">{{ customization.modulesTitle }}</h2>
-          <div class="mt-6 w-72 overflow-hidden rounded-md bg-gray-800">
-            <div class="h-[420px] bg-gradient-to-br from-cyan-400 via-lime-300 to-yellow-400 flex items-end">
-              <img v-if="activeBannerUrl" :src="activeBannerUrl" alt="" class="h-full w-full object-cover">
-              <div v-else class="p-6 text-white text-4xl font-black">BAIXAR FIGURINHAS</div>
+          </article>
+        </section>
+        <section :aria-hidden="panelMode !== 'details'" class="w-full absolute inset-0 transform transition-transform duration-200 ease-in-out bg-white overflow-y-auto" :class="panelMode === 'details' ? 'translate-x-0' : 'translate-x-full'">
+          <header class="flex items-center justify-between bg-gray-50 border-b py-2 pl-4 pr-2">
+            <div class="flex items-center mt-0.5 mr-2">
+              <button class="py-2 rounded-md border border-transparent outline-none focus:outline-none text-gray-400 focus:text-gray-600 hover:text-gray-600" @click="panelMode = 'tree'">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24px" height="24px" class="h-5 w-5"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+              </button>
             </div>
+            <h2 id="slide-over-title" class="flex-1 text-lg font-medium text-gray-900 break-all">{{ activePanelTitle }}</h2>
+            <button v-if="selectedKind === 'section'" title="Excluir" type="button" class="p-2 rounded-md border border-transparent outline-none focus:outline-none text-red-500 hover:bg-red-50" @click="selectedSection && removeSection(selectedSection.id); panelMode = 'tree'">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24px" height="24px" class="h-5 w-5"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            </button>
+            <button v-else disabled="disabled" title="Não é possível excluir todas as seções" type="button" class="p-2 rounded-md border border-transparent outline-none focus:outline-none text-red-300">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24px" height="24px" class="h-5 w-5"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            </button>
+          </header>
+
+          <div class="p-4 space-y-5">
+            <template v-if="selectedKind === 'banner'">
+              <label class="block text-sm font-medium leading-5 text-gray-700">Título</label>
+              <input class="form-input block w-full rounded-md shadow-sm sm:text-sm sm:leading-5" :value="editor.home.banner.title" @input="updateEditor(() => editor.home.banner.title = ($event.target as HTMLInputElement).value)">
+              <label class="block text-sm font-medium leading-5 text-gray-700">Imagem Mobile</label>
+              <label for="banner-mobile-upload" class="hover:bg-gray-50 cursor-pointer flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 transition duration-300 border-dashed rounded-md h-48 items-center" @dragover.prevent @drop="handleImageUpload($event, 'banner')">
+                <div class="space-y-1 text-center">
+                  <svg stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true" class="mx-auto h-12 w-12 text-gray-400"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                  <div class="flex flex-col text-sm text-gray-600"><div class="relative cursor-pointer rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500"><span>Selecione do computador</span><input id="banner-mobile-upload" accept="image/jpeg,image/jpg,image/png,image/webp" type="file" class="sr-only" @change="handleImageUpload($event, 'banner')"></div><p class="pl-1">ou arraste/solte aqui</p></div>
+                  <p class="text-xs text-gray-500">JPEG, JPG, PNG, WEBP até 2 MB</p>
+                </div>
+              </label>
+              <p v-if="uploadError" class="text-sm text-red-600">{{ uploadError }}</p>
+              <label class="block text-sm font-medium leading-5 text-gray-700">Imagem Desktop</label>
+              <div v-if="editor.home.banner.imageUrl" class="relative rounded-md overflow-hidden bg-gray-400 h-40 flex items-center justify-center">
+                <img :src="editor.home.banner.imageUrl" alt="" class="w-full h-full object-cover opacity-80">
+                <button type="button" class="absolute inset-0 m-auto w-10 h-10 flex items-center justify-center rounded-md text-white bg-black bg-opacity-50 hover:bg-opacity-70" @click="clearImage('banner')">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24px" height="24px" class="h-6 w-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+              </div>
+              <label class="flex items-center">
+                <span role="checkbox" tabindex="0" :aria-checked="editor.home.banner.visible" :class="editor.home.banner.visible ? 'bg-indigo-500' : 'bg-gray-200'" class="relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none" @click="updateEditor(() => editor.home.banner.visible = !editor.home.banner.visible)"><span aria-hidden="true" :class="editor.home.banner.visible ? 'translate-x-5' : 'translate-x-0'" class="inline-block h-5 w-5 rounded-full bg-white shadow transform transition ease-in-out duration-200"></span></span>
+                <span class="block text-sm font-medium leading-5 text-gray-700 ml-2 cursor-pointer">Exibir banner</span>
+              </label>
+            </template>
+
+            <template v-else-if="selectedKind === 'slide' && selectedSlide">
+              <label class="block text-sm font-medium leading-5 text-gray-700">Nome do slide</label>
+              <input class="form-input block w-full rounded-md shadow-sm sm:text-sm sm:leading-5" :value="selectedSlide.title" @input="updateEditor(() => selectedSlide!.title = ($event.target as HTMLInputElement).value)">
+              <label class="block text-sm font-medium leading-5 text-gray-700">Imagem Mobile</label>
+              <label :for="`slide-upload-${selectedSlide.id}`" class="hover:bg-gray-50 cursor-pointer flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 transition duration-300 border-dashed rounded-md h-48 items-center" @dragover.prevent @drop="handleImageUpload($event, 'slide')">
+                <div class="space-y-1 text-center">
+                  <svg stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true" class="mx-auto h-12 w-12 text-gray-400"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                  <div class="flex flex-col text-sm text-gray-600"><div class="relative cursor-pointer rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500"><span>Selecione do computador</span><input :id="`slide-upload-${selectedSlide.id}`" accept="image/jpeg,image/jpg,image/png,image/webp" type="file" class="sr-only" @change="handleImageUpload($event, 'slide')"></div><p class="pl-1">ou arraste/solte aqui</p></div>
+                  <p class="text-xs text-gray-500">JPEG, JPG, PNG, WEBP até 2 MB</p>
+                </div>
+              </label>
+              <p v-if="uploadError" class="text-sm text-red-600">{{ uploadError }}</p>
+              <label class="block text-sm font-medium leading-5 text-gray-700">Imagem Desktop</label>
+              <div v-if="selectedSlide.imageUrl" class="relative rounded-md overflow-hidden bg-gray-400 h-40 flex items-center justify-center">
+                <img :src="selectedSlide.imageUrl" alt="" class="w-full h-full object-cover opacity-80">
+                <button type="button" class="absolute inset-0 m-auto w-10 h-10 flex items-center justify-center rounded-md text-white bg-black bg-opacity-50 hover:bg-opacity-70" @click="clearImage('slide')">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24px" height="24px" class="h-6 w-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+              </div>
+              <button type="button" :disabled="editor.home.slides.length <= 1" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-red-600 bg-transparent focus-visible:bg-red-50 hover:bg-red-50 border border-transparent leading-5 text-sm py-2 px-3 gap-2" @click="removeSlide(selectedSlide.id); panelMode = 'tree'">Remover slide</button>
+            </template>
+
+            <template v-else-if="selectedKind === 'section' && selectedSection">
+              <label class="block text-sm font-medium leading-5 text-gray-700">Tipo</label>
+              <select class="form-select block w-full rounded-md shadow-sm sm:text-sm sm:leading-5" :value="selectedSection.type" @change="updateEditor(() => selectedSection!.type = ($event.target as HTMLSelectElement).value)">
+                <option value="modules">Módulos</option>
+                <option value="courses">Cursos</option>
+                <option value="lessons">Aulas</option>
+                <option value="continue">Continuar assistindo</option>
+                <option value="custom">Banner</option>
+              </select>
+              <label class="block text-sm font-medium leading-5 text-gray-700">Título</label>
+              <input class="form-input block w-full rounded-md shadow-sm sm:text-sm sm:leading-5" :value="selectedSection.title" @input="updateEditor(() => selectedSection!.title = ($event.target as HTMLInputElement).value)">
+              <label class="block text-sm font-medium leading-5 text-gray-700">Texto</label>
+              <textarea class="form-textarea block w-full rounded-md shadow-sm sm:text-sm sm:leading-5" rows="3" :value="selectedSection.subtitle" @input="updateEditor(() => selectedSection!.subtitle = ($event.target as HTMLTextAreaElement).value)"></textarea>
+              <label class="block text-sm font-medium leading-5 text-gray-700">Imagem</label>
+              <input class="form-input block w-full rounded-md shadow-sm sm:text-sm sm:leading-5" :value="selectedSection.imageUrl" @input="updateEditor(() => selectedSection!.imageUrl = ($event.target as HTMLInputElement).value)">
+              <div class="flex items-center gap-2">
+                <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-600 bg-transparent focus-visible:bg-gray-100 hover:bg-gray-100 border border-gray-300 leading-5 text-sm py-2 px-3 gap-2" @click="moveSection(selectedSection.id, -1)">Subir</button>
+                <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-600 bg-transparent focus-visible:bg-gray-100 hover:bg-gray-100 border border-gray-300 leading-5 text-sm py-2 px-3 gap-2" @click="moveSection(selectedSection.id, 1)">Descer</button>
+                <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-600 bg-transparent focus-visible:bg-gray-100 hover:bg-gray-100 border border-gray-300 leading-5 text-sm py-2 px-3 gap-2" @click="duplicateSection(selectedSection)">Duplicar</button>
+              </div>
+            </template>
+
+            <template v-else-if="activeTab === 'menu'">
+              <label class="block text-sm font-medium leading-5 text-gray-700">Nome da área</label>
+              <input class="form-input block w-full rounded-md shadow-sm sm:text-sm sm:leading-5" :value="editor.sidebar.title" @input="updateEditor(() => editor.sidebar.title = ($event.target as HTMLInputElement).value)">
+              <label class="block text-sm font-medium leading-5 text-gray-700">Marca</label>
+              <input class="form-input block w-full rounded-md shadow-sm sm:text-sm sm:leading-5" :value="editor.sidebar.brandName" @input="updateEditor(() => editor.sidebar.brandName = ($event.target as HTMLInputElement).value)">
+              <label class="block text-sm font-medium leading-5 text-gray-700">Logo</label>
+              <input class="form-input block w-full rounded-md shadow-sm sm:text-sm sm:leading-5" :value="editor.sidebar.logoUrl" @input="updateEditor(() => editor.sidebar.logoUrl = ($event.target as HTMLInputElement).value)">
+              <label class="block text-sm font-medium leading-5 text-gray-700">Home</label>
+              <input class="form-input block w-full rounded-md shadow-sm sm:text-sm sm:leading-5" :value="editor.sidebar.links.home" @input="updateEditor(() => editor.sidebar.links.home = ($event.target as HTMLInputElement).value)">
+              <label class="block text-sm font-medium leading-5 text-gray-700">Instagram</label>
+              <input class="form-input block w-full rounded-md shadow-sm sm:text-sm sm:leading-5" :value="editor.sidebar.links.instagram" @input="updateEditor(() => editor.sidebar.links.instagram = ($event.target as HTMLInputElement).value)">
+              <label class="block text-sm font-medium leading-5 text-gray-700">Link Instagram</label>
+              <input class="form-input block w-full rounded-md shadow-sm sm:text-sm sm:leading-5" :value="editor.sidebar.links.instagramUrl" @input="updateEditor(() => editor.sidebar.links.instagramUrl = ($event.target as HTMLInputElement).value)">
+              <label class="block text-sm font-medium leading-5 text-gray-700">Suporte</label>
+              <input class="form-input block w-full rounded-md shadow-sm sm:text-sm sm:leading-5" :value="editor.sidebar.links.support" @input="updateEditor(() => editor.sidebar.links.support = ($event.target as HTMLInputElement).value)">
+              <label class="block text-sm font-medium leading-5 text-gray-700">Link Suporte</label>
+              <input class="form-input block w-full rounded-md shadow-sm sm:text-sm sm:leading-5" :value="editor.sidebar.links.supportUrl" @input="updateEditor(() => editor.sidebar.links.supportUrl = ($event.target as HTMLInputElement).value)">
+            </template>
+
+            <template v-else-if="activeTab === 'login'">
+              <label class="block text-sm font-medium leading-5 text-gray-700">Título do login</label>
+              <input class="form-input block w-full rounded-md shadow-sm sm:text-sm sm:leading-5" :value="editor.login.title || 'Acesse sua área de membros'" @input="updateEditor(() => editor.login.title = ($event.target as HTMLInputElement).value)">
+              <label class="block text-sm font-medium leading-5 text-gray-700">Texto de apoio</label>
+              <textarea class="form-textarea block w-full rounded-md shadow-sm sm:text-sm sm:leading-5" rows="3" :value="editor.login.subtitle || ''" @input="updateEditor(() => editor.login.subtitle = ($event.target as HTMLTextAreaElement).value)"></textarea>
+              <label class="block text-sm font-medium leading-5 text-gray-700">Imagem de fundo</label>
+              <input class="form-input block w-full rounded-md shadow-sm sm:text-sm sm:leading-5" :value="editor.login.imageUrl || editor.home.banner.imageUrl" @input="updateEditor(() => editor.login.imageUrl = ($event.target as HTMLInputElement).value)">
+            </template>
+
+            <template v-else-if="activeTab === 'settings'">
+              <label class="block text-sm font-medium leading-5 text-gray-700">Cor principal</label>
+              <input type="color" class="form-input block w-full rounded-md shadow-sm sm:text-sm sm:leading-5 h-10" :value="editor.theme.primaryColor" @input="updateEditor(() => editor.theme.primaryColor = ($event.target as HTMLInputElement).value)">
+              <label class="block text-sm font-medium leading-5 text-gray-700">Cor do menu</label>
+              <input type="color" class="form-input block w-full rounded-md shadow-sm sm:text-sm sm:leading-5 h-10" :value="editor.theme.sidebarColor" @input="updateEditor(() => editor.theme.sidebarColor = ($event.target as HTMLInputElement).value)">
+              <label class="block text-sm font-medium leading-5 text-gray-700">Fundo</label>
+              <input type="color" class="form-input block w-full rounded-md shadow-sm sm:text-sm sm:leading-5 h-10" :value="editor.theme.backgroundColor" @input="updateEditor(() => editor.theme.backgroundColor = ($event.target as HTMLInputElement).value)">
+              <label class="flex items-center">
+                <span role="checkbox" tabindex="0" :aria-checked="!!editor.settings.commentsEnabled" :class="editor.settings.commentsEnabled ? 'bg-indigo-500' : 'bg-gray-200'" class="relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none" @click="updateEditor(() => editor.settings.commentsEnabled = !editor.settings.commentsEnabled)"><span aria-hidden="true" :class="editor.settings.commentsEnabled ? 'translate-x-5' : 'translate-x-0'" class="inline-block h-5 w-5 rounded-full bg-white shadow transform transition ease-in-out duration-200"></span></span>
+                <span class="block text-sm font-medium leading-5 text-gray-700 ml-2 cursor-pointer">Ativar comentários</span>
+              </label>
+            </template>
           </div>
-        </div>
+        </section>
       </section>
-
-      <aside class="w-[385px] flex-none bg-white border-l border-gray-200">
-        <div class="h-20 border-b border-gray-200 flex items-center px-7">
-          <h2 class="text-2xl font-medium text-gray-900">Início</h2>
-        </div>
-        <div class="p-7">
-          <h3 class="text-base font-medium text-gray-700">Seções</h3>
-          <div class="mt-7 space-y-6 text-gray-600">
-            <div class="flex items-center gap-3">
-              <svg class="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4-4 4 4 4-4 4 4M4 20h16M6 4h12v10H6z"></path></svg>
-              <span class="font-medium">Banner</span>
-            </div>
-            <div class="flex items-center gap-3 pl-9">
-              <svg class="h-6 w-6 text-gray-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"></path></svg>
-              <span>Slide - <em>Slide e imagem</em></span>
-            </div>
-            <button type="button" class="flex items-center gap-3 pl-9 text-blue-600">
-              <span class="h-6 w-6 rounded-full border-2 border-blue-600 flex items-center justify-center font-bold">+</span>
-              Adicionar slide (1/3)
-            </button>
-            <div class="flex items-center gap-3">
-              <svg class="h-6 w-6 text-gray-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2 11a2 2 0 012-2h2V7a2 2 0 012-2h4a2 2 0 012 2v2h2a2 2 0 012 2v5h-4v-4h-3v4H7v-4H4v4H2v-5z"></path></svg>
-              <span>Módulos - <em>Uma seção pode conter ...</em></span>
-            </div>
-            <button type="button" class="flex items-center gap-3 text-blue-600">
-              <span class="h-6 w-6 rounded-full border-2 border-blue-600 flex items-center justify-center font-bold">+</span>
-              Adicionar seção
-            </button>
-          </div>
-
-          <div class="mt-10 border-t border-gray-200 pt-6 space-y-4">
-            <label class="block text-sm font-medium text-gray-700">Logo</label>
-            <input v-model="customization.logoUrl" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" placeholder="https://...">
-            <label class="block text-sm font-medium text-gray-700">Banner</label>
-            <input v-model="customization.bannerUrl" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" placeholder="https://...">
-            <label class="block text-sm font-medium text-gray-700">Marca</label>
-            <input v-model="customization.brandName" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
-            <label class="block text-sm font-medium text-gray-700">Título</label>
-            <input v-model="customization.heroTitle" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
-            <label class="block text-sm font-medium text-gray-700">Título dos módulos</label>
-            <input v-model="customization.modulesTitle" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
-            <div class="grid grid-cols-2 gap-3">
-              <label class="block text-sm font-medium text-gray-700">Sidebar<input v-model="customization.sidebarColor" type="color" class="mt-1 h-10 w-full"></label>
-              <label class="block text-sm font-medium text-gray-700">Fundo<input v-model="customization.backgroundColor" type="color" class="mt-1 h-10 w-full"></label>
-            </div>
-            <label class="flex items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" :checked="hasSection('banner')" @change="toggleSection('banner')">
-              Banner visível
-            </label>
-            <label class="flex items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" :checked="hasSection('modules')" @change="toggleSection('modules')">
-              Módulos visíveis
-            </label>
-          </div>
-        </div>
-      </aside>
-    </main>
-
-    <button type="button" class="fixed right-7 bottom-7 h-16 w-16 rounded-full bg-black text-white shadow-lg flex items-center justify-center">
-      <svg class="h-8 w-8" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.84 8.84 0 01-4.083-.98L2 17l1.338-3.123A6.94 6.94 0 012 10c0-3.866 3.582-7 8-7s8 3.134 8 7zm-9-2a1 1 0 012 0v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1H8a1 1 0 110-2h1V8z" clip-rule="evenodd"></path></svg>
-    </button>
-  </div>
+    </div>
+  </main>
 </template>
 
-<style scoped>
-.editor-shell {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
+<style>
+.phone-container{width:100%;height:100%}
+.phone-enabled{display:flex;align-items:center;justify-content:center;padding:.25rem;box-sizing:border-box}
+.phone-device{width:100%;height:100%}
+.phone-frame-active{position:relative;--iphone-width:306;--iphone-height:642;--max-phone-height:min(calc(100vh - var(--navbar-size)),800px);--max-phone-width:calc(var(--max-phone-height)*var(--iphone-width)/var(--iphone-height));aspect-ratio:var(--iphone-width)/var(--iphone-height);width:min(100%,var(--max-phone-width));height:auto;max-height:100%;background:linear-gradient(145deg,#2a2a2a,#1a1a1a);border:solid #0f0f0f;border-radius:clamp(20px,3vw,32px);padding:clamp(1px,.2vw,2px);box-shadow:0 25px 50px -12px rgba(0,0,0,.4),0 10px 20px -5px rgba(0,0,0,.2),inset 0 1px 2px hsla(0,0%,100%,.1)}
+.volume-buttons{position:absolute;left:calc(clamp(2px, .4vw, 4px)*-1 + -2px);top:15%;z-index:15}
+.volume-down,.volume-up{width:clamp(1px,.3vw,3px);background:linear-gradient(90deg,#2a2a2a,#1a1a1a);border-radius:0 2px 2px 0;box-shadow:inset 0 1px 2px rgba(0,0,0,.5)}
+.volume-up{height:clamp(16px,5%,24px);margin-bottom:0.25rem}
+.volume-down{height:clamp(24px,7%,32px)}
+.power-button{position:absolute;right:calc(clamp(2px, .4vw, 4px)*-1 + -2px);top:10%;width:clamp(1px,.3vw,3px);height:8%;background:linear-gradient(270deg,#2a2a2a,#1a1a1a);border-radius:2px 0 0 2px;box-shadow:inset 0 1px 2px rgba(0,0,0,.5);z-index:15}
+.phone-frame{position:relative;width:100%;height:100%;--bg-opacity:1;background-color:#000000;background-color:rgba(0,0,0,var(--bg-opacity));overflow:hidden;border-radius:clamp(18px,2.8vw,28px)}
+.dynamic-island{position:absolute;top:clamp(8px,1.5%,12px);left:50%;transform:translateX(-50%);width:25%;height:3.5%;background:linear-gradient(145deg,#0a0a0a,#1a1a1a);border-radius:clamp(12px,1.8vw,16px);border:1px solid hsla(0,0%,100%,.03);box-shadow:0 4px 12px rgba(0,0,0,.6);z-index:20}
+.island-speaker{position:absolute;--bg-opacity:1;background-color:#252f3f;background-color:rgba(37,47,63,var(--bg-opacity));border-radius:0.125rem;top:50%;left:30%;transform:translate(-50%,-50%);width:clamp(20px,3vw,28px);height:clamp(2px,.3vh,3px)}
+.island-camera{position:absolute;border-radius:9999px;top:50%;right:8px;transform:translateY(-50%);width:clamp(6px,1vw,9px);height:clamp(6px,1vw,9px);background:radial-gradient(circle,#0a0a0a,#2a2a2a);box-shadow:inset 0 1px 2px rgba(0,0,0,.9)}
+.home-indicator{position:absolute;border-radius:0.25rem;bottom:8px;left:50%;transform:translateX(-50%);width:clamp(100px,15vw,140px);height:clamp(3px,.5vh,5px);background:hsla(0,0%,100%,.4);z-index:20}
+.members-area-editor .screen{width:100%;height:100%;position:static;top:auto;left:auto;border:0;border-radius:0;background:transparent;box-sizing:border-box;cursor:auto;overflow:visible}
+.ce-dropdown{--arrow-size:4px;top:calc(100% + var(--arrow-size) + 2px);width:-moz-max-content;width:max-content}
+.ce-dropdown:before{content:"";position:absolute;top:calc(var(--arrow-size)*-1);width:0;height:0;border-left:var(--arrow-size) solid transparent;border-right:var(--arrow-size) solid transparent;border-bottom:var(--arrow-size) solid #fff}
+.ce-dropdown.end{right:0}
+.ce-dropdown.end:before{right:8px}
+.max-w-24rem{max-width:24rem}
+.overscroll-none{overscroll-behavior:none}
+.members-area-editor{--navbar-padding-x:0.75rem;--sidebar-width:24rem;--page-content-height:calc(100vh - var(--navbar-size));--page-content-padding:0}
+.members-area-editor.sidebar-open{--navbar-padding-x:calc(var(--scrollbar-width) + 0.75rem);--page-content-padding-right:var(--sidebar-width)}
+.members-area-editor .navbar{min-height:3.5rem;padding-left:var(--navbar-padding-x);padding-right:var(--navbar-padding-x)}
+.members-area-editor .page-content{height:var(--page-content-height);padding:var(--page-content-padding) var(--page-content-padding-right,var(--page-content-padding)) var(--page-content-padding) var(--page-content-padding)}
+.ce-sidebar{top:var(--navbar-size)}
+@media (min-width:1536px){.members-area-editor{--page-content-padding:0.75rem}.members-area-editor.sidebar-open .page-content{--page-content-padding-right:calc(var(--sidebar-width) + var(--page-content-padding))}}
+@media (max-width:480px) or ((orientation:landscape) and (max-height:600px)){.phone-enabled{padding:.125rem}}
 </style>

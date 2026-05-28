@@ -35,6 +35,48 @@ export type MemberClub = {
   brandName?: string
   logoUrl?: string
   customization?: {
+    theme?: {
+      primaryColor?: string
+      sidebarColor?: string
+      backgroundColor?: string
+      textColor?: string
+    }
+    sidebar?: {
+      logoUrl?: string
+      brandName?: string
+      title?: string
+      collapsed?: boolean
+      links?: {
+        home?: string
+        instagram?: string
+        support?: string
+        instagramUrl?: string
+        supportUrl?: string
+      }
+    }
+    home?: {
+      banner?: {
+        title?: string
+        imageUrl?: string
+        visible?: boolean
+      }
+      slides?: Array<{
+        id: string
+        title?: string
+        imageUrl?: string
+      }>
+      sections?: Array<{
+        id: string
+        type: string
+        title: string
+        subtitle?: string
+        imageUrl?: string
+        visible?: boolean
+      }>
+    }
+    menu?: Record<string, any>
+    login?: Record<string, any>
+    settings?: Record<string, any>
     logoUrl?: string
     bannerUrl?: string
     primaryColor?: string
@@ -57,13 +99,14 @@ export type MemberClubData = {
   modules: MemberClubModule[]
 }
 
-const thumbnailBase = 'https://aws-assets.kiwify.com.br/cdn-cgi/image/w=400,h=600,f=avif,q=85,fit=cover/Qlf7xYHJBhIz7k6'
+export const defaultClubBanner = 'https://aws-assets.kiwify.com.br/Qlf7xYHJBhIz7k6/img_0_Design-sem-nome_c4f6eff966f84e6aa1cc65d4b63d7e3a.png'
+export const defaultFigurinhasModuleImage = 'https://aws-assets.kiwify.com.br/Qlf7xYHJBhIz7k6/Mobile-1_e271e950cb2c496e913cd05907b971e0.png'
 
 const mockModules: MemberClubModule[] = [
   {
     id: 'welcome',
-    title: 'Bem vindos',
-    imageUrl: `${thumbnailBase}/course_thumbnails_6704b17e-44e7-40fc-9131-dd0fab0e1ccf_751bc2c31cdb48f2b029792f8cad4053.png`,
+    title: 'Baixar Figurinhas',
+    imageUrl: defaultFigurinhasModuleImage,
     position: 1,
     status: 'available',
     lessons: [
@@ -80,8 +123,8 @@ const mockModules: MemberClubModule[] = [
   },
   {
     id: 'install',
-    title: 'Instalação',
-    imageUrl: `${thumbnailBase}/course_thumbnails_9aa9492e-3e8f-41c9-b69d-0b65d7cb5634_e22b4e18419d44eea68d2f1e3edf9b37.png`,
+    title: 'Álbum Digital',
+    imageUrl: defaultFigurinhasModuleImage,
     position: 2,
     status: 'available',
     lessons: [
@@ -107,8 +150,8 @@ const mockModules: MemberClubModule[] = [
   },
   {
     id: 'editing',
-    title: 'Edição',
-    imageUrl: `${thumbnailBase}/course_thumbnails_7d9b08af-7d1b-4f53-9ddc-230de8785fe9_0aa8f953684148f8902eba0906962ff8.png`,
+    title: 'Impressão',
+    imageUrl: defaultFigurinhasModuleImage,
     position: 3,
     status: 'available',
     lessons: [
@@ -126,7 +169,7 @@ const mockModules: MemberClubModule[] = [
   {
     id: 'bonus',
     title: 'Bônus',
-    imageUrl: `${thumbnailBase}/course_thumbnails_54e8445b-0c0d-4b18-b96b-5d60d17f3400_18e3cf2cdf1041dea85547ceea7bd201.png`,
+    imageUrl: defaultFigurinhasModuleImage,
     position: 4,
     status: 'available',
     lessons: [
@@ -154,7 +197,8 @@ export const memberClubMocks: Record<string, MemberClubData> = {
     },
     course: {
       id: 'b156fdb6-0917-4611-b7d1-3f9915102202',
-      title: 'Figurinhas da Copa 2026'
+      title: 'Figurinhas da Copa 2026',
+      coverUrl: defaultClubBanner
     },
     modules: mockModules
   },
@@ -168,7 +212,8 @@ export const memberClubMocks: Record<string, MemberClubData> = {
     },
     course: {
       id: '3499d88a-a13d-44d9-8659-d6dd463e9e8f',
-      title: 'Robô do Lightroom Mobile'
+      title: 'Robô do Lightroom Mobile',
+      coverUrl: defaultClubBanner
     },
     modules: mockModules
   },
@@ -182,7 +227,8 @@ export const memberClubMocks: Record<string, MemberClubData> = {
     },
     course: {
       id: 'ff3e052e-bc89-466f-9392-d1cf3fe738dc',
-      title: 'Figurinhas da Copa 2026'
+      title: 'Figurinhas da Copa 2026',
+      coverUrl: defaultClubBanner
     },
     modules: mockModules
   }

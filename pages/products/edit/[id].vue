@@ -92,6 +92,7 @@ const readSettingsForm = () => {
   const boletoValidityDays = Number(settings?.querySelector<HTMLInputElement>('[data-setting="boleto-validity-days"]')?.value || 3) || 3
 
   return {
+    ...(product.value?.settings || {}),
     paymentMethod,
     paymentMethods: paymentMethodsFromSetting(paymentMethod),
     installments,

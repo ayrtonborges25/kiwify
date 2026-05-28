@@ -1,51 +1,92 @@
 <script setup lang="ts">
+import LessonItem from '~/components/member-club/LessonItem.vue'
+import { defaultFigurinhasModuleImage } from '~/data/memberClub'
 import type { MemberClubLesson, MemberClubModule } from '~/data/memberClub'
 
-defineProps<{
+const props = defineProps<{
   modules: MemberClubModule[]
   expandedModuleIds: string[]
   currentLessonId?: string
   completedLessonIds: string[]
+  showLessons?: boolean
 }>()
 
 defineEmits<{
   toggleModule: [moduleId: string]
   selectLesson: [lesson: MemberClubLesson]
 }>()
+
+const route = useRoute()
+const isFigurinhasRoute = computed(() => {
+  const routeId = String(route.query.id || route.params.id || '')
+  return routeId === '1cbe33c8-14d3-4612-81e4-b52587203765' || routeId === 'c6d46bd7-9ced-4fb2-a4a0-ae033e3b612a'
+})
+const safeModuleImage = (src?: string) => {
+  if (isFigurinhasRoute.value) return defaultFigurinhasModuleImage
+  if (!src || /rob[oô]|lightroom|ribas|presets/i.test(src)) return defaultFigurinhasModuleImage
+  return src
+}
+const currentModule = computed(() => {
+  return props.modules.find((module) => module.lessons.some((lesson) => lesson.id === props.currentLessonId)) || props.modules[0]
+})
 </script>
 
 <template>
-  <section class="club-modules">
-    <h2>Módulos</h2>
+  <section id="section__" class="kiwi-section relative z-0 hover:z-10 has-[:focus]:z-20 px-6 md:px-12 pb-6 md:pb-12 content-section content-section--modules" data-kiwi-section-id="">
+    <div class="pt-8">
+      <h2 id="section____title" class="kiwi-section__title font-semibold text-xl drop-shadow-hard-light dark:drop-shadow-hard mb-1 sm:mb-3 flex flex-row items-center gap-2 relative z-20">Módulos</h2>
 
-    <div class="club-module-strip">
-      <article
-        v-for="module in modules"
-        :key="module.id"
-        class="club-module-card"
-        @click="$emit('toggleModule', module.id)"
-      >
-        <figure class="club-module-card__image">
-          <img v-if="module.imageUrl" :src="module.imageUrl" :alt="module.title">
-        </figure>
-        <ProgressBar :value="module.lessons.length ? Math.round((module.lessons.filter((lesson) => completedLessonIds.includes(lesson.id)).length / module.lessons.length) * 100) : 0" />
-        <div class="club-module-card__body">
-          <strong>{{ module.title }}</strong>
-          <span>{{ module.lessons.length }} {{ module.lessons.length === 1 ? 'conteúdo' : 'conteúdos' }}</span>
+      <div>
+        <div class="embla relative group" data-embla-options="{ &quot;loop&quot;: false, &quot;dragFree&quot;: true }">
+          <div class="embla__viewport">
+            <div class="embla__container flex items-start gap-4 *:flex-grow-0 *:flex-shrink-0 *:basis-auto *:min-w-0 *:max-w-full">
+              <div
+                v-for="module in modules"
+                :key="module.id"
+                class="embla__slide cursor-pointer focus:scale-105 hover:scale-105 relative sci group/sci block z-0 hover:z-10 rounded-lg transform transition-all ease-in-out duration-300 scale-100 w-5/12 md:w-64"
+                @click="showLessons && module.lessons[0] ? $emit('selectLesson', module.lessons[0]) : $emit('toggleModule', module.id)"
+              >
+                <div :data-kiwi-router-link="`/${module.id}`">
+                  <div class="relative">
+                    <div class="club-image-container">
+                      <figure class="rounded-t-lg sci__img z-10 relative select-none leading-[0px] leading-[0px]">
+                        <img
+                          v-if="module.imageUrl"
+                          width="400"
+                          height="600"
+                          :src="safeModuleImage(module.imageUrl)"
+                          @error="($event.target as HTMLImageElement).src = defaultFigurinhasModuleImage"
+                          :alt="module.title"
+                          class="rounded-lg select-none transition-all ease-in-out duration-300 bg-primary object-contain aspect-[2/3]"
+                          style="aspect-ratio: 400 / 600;"
+                        >
+                      </figure>
+                    </div>
+                    <div class="z-10 absolute bottom-0 inset-x-0 flex flex-row items-center justify-center rounded-b-lg overflow-hidden">
+                      <progress
+                        aria-valuemax="100"
+                        :aria-valuenow="module.lessons.length ? Math.round((module.lessons.filter((lesson) => completedLessonIds.includes(lesson.id)).length / module.lessons.length) * 100) : 0"
+                        class="block appearance-none border-none overflow-hidden w-full h-1 rounded-none text-red-500 dark:text-red-400"
+                        max="100"
+                        :value="module.lessons.length ? Math.round((module.lessons.filter((lesson) => completedLessonIds.includes(lesson.id)).length / module.lessons.length) * 100) : 0"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </article>
-    </div>
+      </div>
 
-    <div class="club-module-lessons">
-      <article v-for="module in modules" :key="`list-${module.id}`" class="club-module-group">
-        <button type="button" class="club-module-group__head" @click="$emit('toggleModule', module.id)">
-          <span>{{ module.title }}</span>
-          <small>{{ module.lessons.length }} {{ module.lessons.length === 1 ? 'aula' : 'aulas' }}</small>
-          <strong>{{ expandedModuleIds.includes(module.id) ? '⌃' : '⌄' }}</strong>
-        </button>
-        <div v-if="expandedModuleIds.includes(module.id)" class="club-module-group__lessons">
+      <div v-if="showLessons && currentModule" class="club-lessons-list">
+        <div class="club-lessons-list__header">
+          <strong>{{ currentModule.title }}</strong>
+          <span>{{ currentModule.lessons.length }} aula{{ currentModule.lessons.length === 1 ? '' : 's' }}</span>
+        </div>
+        <div class="club-lessons-list__items">
           <LessonItem
-            v-for="lesson in module.lessons"
+            v-for="lesson in currentModule.lessons"
             :key="lesson.id"
             :lesson="lesson"
             :active="lesson.id === currentLessonId"
@@ -53,115 +94,40 @@ defineEmits<{
             @select="$emit('selectLesson', $event)"
           />
         </div>
-      </article>
+      </div>
     </div>
   </section>
 </template>
 
 <style scoped>
-.club-modules {
-  padding: 42px 0 64px;
-}
-
-.club-modules h2 {
-  margin: 0 0 22px;
-  color: #fff;
-  font-size: 28px;
-  font-weight: 700;
-}
-
-.club-module-strip {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  overflow-x: auto;
-  padding: 0 0 24px;
-}
-
-.club-module-card {
-  flex: 0 0 256px;
-  width: 256px;
+.club-lessons-list {
+  margin-top: 32px;
+  border: 1px solid rgba(255, 255, 255, .16);
   border-radius: 8px;
   overflow: hidden;
-  background: #151515;
-  cursor: pointer;
-  transition: transform .2s ease;
+  background: rgba(255, 255, 255, .03);
 }
 
-.club-module-card:hover {
-  transform: scale(1.03);
-}
-
-.club-module-card__image {
-  margin: 0;
-  width: 256px;
-  height: 384px;
-  background: #171717;
-}
-
-.club-module-card__image img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.club-module-card__body {
-  padding: 14px 16px 18px;
+.club-lessons-list__header {
+  min-height: 72px;
+  padding: 0 24px;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.club-module-card__body strong {
-  color: #fff;
-  font-size: 20px;
-  line-height: 1.25;
-}
-
-.club-module-card__body span {
-  color: #a3a3a3;
-  font-size: 14px;
-}
-
-.club-module-lessons {
-  display: grid;
-  gap: 12px;
-  max-width: 900px;
-}
-
-.club-module-group {
-  border-radius: 8px;
-  background: #111;
-  border: 1px solid #242424;
-  overflow: hidden;
-}
-
-.club-module-group__head {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  color: #fff;
-  padding: 18px 20px;
-  display: grid;
-  grid-template-columns: 1fr auto auto;
   align-items: center;
+  justify-content: space-between;
   gap: 18px;
-  text-align: left;
-  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, .12);
+  color: #fff;
 }
 
-.club-module-group__head span {
-  font-size: 20px;
-  font-weight: 700;
+.club-lessons-list__header strong {
+  font-size: 24px;
 }
 
-.club-module-group__head small {
-  color: #a3a3a3;
+.club-lessons-list__header span {
+  color: #b7b7b7;
 }
 
-.club-module-group__lessons {
-  border-top: 1px solid #242424;
-  padding: 8px 12px 12px;
+.club-lessons-list__items {
+  padding: 8px 16px;
 }
 </style>

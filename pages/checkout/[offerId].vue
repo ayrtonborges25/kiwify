@@ -22,9 +22,9 @@ const form = reactive({
   confirmEmail: '',
   document: '',
   phone: '',
-  cardName: '',
   cardNumber: '',
-  cardExpiry: '',
+  cardExpiryMonth: '',
+  cardExpiryYear: '',
   cardCvv: ''
 })
 
@@ -133,9 +133,9 @@ const validate = () => {
   if (collectDocument.value && !form.document.trim()) nextErrors.push('Informe CPF/CNPJ.')
   if (collectPhone.value && !form.phone.trim()) nextErrors.push('Informe seu telefone.')
   if (paymentMethod.value === 'credit_card') {
-    if (!form.cardName.trim()) nextErrors.push('Informe o nome do cartão.')
     if (!form.cardNumber.trim()) nextErrors.push('Informe o número do cartão.')
-    if (!form.cardExpiry.trim()) nextErrors.push('Informe a validade do cartão.')
+    if (!form.cardExpiryMonth.trim()) nextErrors.push('Informe o mês do cartão.')
+    if (!form.cardExpiryYear.trim()) nextErrors.push('Informe o ano do cartão.')
     if (!form.cardCvv.trim()) nextErrors.push('Informe o CVV.')
   }
   errors.value = nextErrors
@@ -148,7 +148,8 @@ const submitOrder = async () => {
   paymentError.value = ''
 
   try {
-    const [expiryMonth = '', expiryYearRaw = ''] = form.cardExpiry.split(/[\/\s-]+/).map((part) => part.trim())
+    const expiryMonth = form.cardExpiryMonth.trim()
+    const expiryYearRaw = form.cardExpiryYear.trim()
     const expiryYear = expiryYearRaw.length === 2 ? `20${expiryYearRaw}` : expiryYearRaw
     const result = await $fetch<{ saleId: string; status?: string; accessUrl?: string }>('/api/checkout/create-payment', {
       method: 'POST',
@@ -165,7 +166,7 @@ const submitOrder = async () => {
         installments: paymentMethod.value === 'credit_card' ? selectedInstallments.value : undefined,
         card: paymentMethod.value === 'credit_card'
           ? {
-              holderName: form.cardName || form.name,
+              holderName: form.name,
               number: form.cardNumber,
               expiryMonth,
               expiryYear,
@@ -276,10 +277,10 @@ useHead({
               </div>
               <div class="card-field-grid pb-3">
                 <div class="kiwi-input">
-                  <input v-model="form.cardExpiry" type="text" placeholder="Mês" class="kiwi-input-field">
+                  <input v-model="form.cardExpiryMonth" type="text" inputmode="numeric" placeholder="Mês" class="kiwi-input-field">
                 </div>
                 <div class="kiwi-input">
-                  <input v-model="form.cardName" type="text" placeholder="Ano" class="kiwi-input-field">
+                  <input v-model="form.cardExpiryYear" type="text" inputmode="numeric" placeholder="Ano" class="kiwi-input-field">
                 </div>
                 <div class="kiwi-input">
                   <input v-model="form.cardCvv" type="tel" inputmode="numeric" placeholder="Cód. segurança" class="kiwi-input-field">

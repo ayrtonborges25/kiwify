@@ -139,6 +139,16 @@ create table if not exists public.members_areas (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.members_area_groups (
+  id text primary key,
+  members_area_id uuid references public.members_areas(id) on delete cascade,
+  name text not null,
+  students integer not null default 0,
+  is_default boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.courses (
   id uuid primary key default gen_random_uuid(),
   members_area_id uuid references public.members_areas(id) on delete cascade,
@@ -240,6 +250,7 @@ alter table public.product_settings add column if not exists collect_instagram_e
 alter table public.product_settings add column if not exists auto_currency_enabled boolean not null default false;
 alter table public.product_settings add column if not exists thank_you_enabled boolean not null default false;
 alter table public.product_settings add column if not exists thank_you_url text;
+alter table public.product_settings add column if not exists upsell_settings jsonb not null default '{}'::jsonb;
 alter table public.product_settings add column if not exists created_at timestamptz not null default now();
 alter table public.product_settings add column if not exists updated_at timestamptz not null default now();
 
@@ -363,6 +374,7 @@ create index if not exists idx_sales_provider_payment_id on public.sales(provide
 create index if not exists idx_sales_created_at on public.sales(created_at desc);
 create index if not exists idx_members_areas_user_id on public.members_areas(user_id);
 create index if not exists idx_members_areas_product_id on public.members_areas(product_id);
+create index if not exists idx_members_area_groups_area_id on public.members_area_groups(members_area_id);
 create index if not exists idx_courses_members_area_id on public.courses(members_area_id);
 create index if not exists idx_courses_product_id on public.courses(product_id);
 create index if not exists idx_modules_course_id on public.modules(course_id);
@@ -427,6 +439,7 @@ alter table public.product_checkouts enable row level security;
 alter table public.checkout_settings enable row level security;
 alter table public.sales enable row level security;
 alter table public.members_areas enable row level security;
+alter table public.members_area_groups enable row level security;
 alter table public.courses enable row level security;
 alter table public.modules enable row level security;
 alter table public.lessons enable row level security;
@@ -564,6 +577,15 @@ drop policy if exists "clone anon members areas read" on public.members_areas;
 create policy "clone anon members areas read" on public.members_areas for select to anon using (true);
 drop policy if exists "clone anon members areas write" on public.members_areas;
 create policy "clone anon members areas write" on public.members_areas for all to anon using (true) with check (true);
+
+drop policy if exists "clone anon members area groups read" on public.members_area_groups;
+create policy "clone anon members area groups read" on public.members_area_groups for select to anon using (true);
+drop policy if exists "clone anon members area groups write" on public.members_area_groups;
+create policy "clone anon members area groups write" on public.members_area_groups for all to anon using (true) with check (true);
+drop policy if exists "members area groups authenticated read" on public.members_area_groups;
+create policy "members area groups authenticated read" on public.members_area_groups for select to authenticated using (true);
+drop policy if exists "members area groups authenticated write" on public.members_area_groups;
+create policy "members area groups authenticated write" on public.members_area_groups for all to authenticated using (true) with check (true);
 
 drop policy if exists "clone anon courses read" on public.courses;
 create policy "clone anon courses read" on public.courses for select to anon using (true);

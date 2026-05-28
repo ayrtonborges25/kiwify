@@ -25,7 +25,43 @@ const defaultSettings: MembersAreaSettings = {
   type: 'complete',
   commentsEnabled: false
 }
+const defaultClubBanner = 'https://aws-assets.kiwify.com.br/Qlf7xYHJBhIz7k6/img_0_Design-sem-nome_c4f6eff966f84e6aa1cc65d4b63d7e3a.png'
 const defaultCustomization: MembersAreaCustomization = {
+  theme: {
+    primaryColor: '#4f46e5',
+    sidebarColor: '#facc15',
+    backgroundColor: '#080808',
+    textColor: '#ffffff'
+  },
+  sidebar: {
+    logoUrl: '',
+    brandName: 'RETRATISTAS DIGITAIS',
+    title: 'Figurinhas da Copa 2026',
+    collapsed: false,
+    links: {
+      home: 'Home',
+      instagram: 'Instagram',
+      support: 'Suporte',
+      instagramUrl: 'https://instagram.com',
+      supportUrl: 'mailto:suporte@ayrtonborgesonline.com'
+    }
+  },
+  home: {
+    banner: {
+      title: 'Figurinhas da Copa 2026',
+      imageUrl: defaultClubBanner,
+      visible: true
+    },
+    slides: [
+      { id: 'slide-1', title: 'Slide', imageUrl: defaultClubBanner }
+    ],
+    sections: [
+      { id: 'modules', type: 'modules', title: 'Uma seção pode conter módulos', visible: true }
+    ]
+  },
+  menu: {},
+  login: {},
+  settings: {},
   primaryColor: '#4f46e5',
   sidebarColor: '#facc15',
   backgroundColor: '#080808',
@@ -39,6 +75,89 @@ const defaultCustomization: MembersAreaCustomization = {
   visibleSections: ['banner', 'modules']
 }
 const mockGroupsStore: Record<string, MembersAreaGroup[]> = {}
+const isFigurinhasArea = (areaName = '') => /figurinhas|copa 2026/i.test(areaName)
+const cleanFigurinhasImage = (value = '') => {
+  if (/^(data:image|blob:)/i.test(value) || /member-area-covers/i.test(value)) return value
+  if (!value || /robo|rob[oô]|lightroom|presets|ribas/i.test(value)) return defaultClubBanner
+  return value
+}
+
+const normalizeCustomization = (customization: MembersAreaCustomization = {}, areaName = 'Figurinhas da Copa 2026', coverUrl = ''): MembersAreaCustomization => {
+  const forceFigurinhas = isFigurinhasArea(areaName)
+  const coverFallback = forceFigurinhas ? cleanFigurinhasImage(coverUrl) : (coverUrl || defaultClubBanner)
+  const theme = {
+    ...defaultCustomization.theme,
+    ...(customization.theme || {}),
+    primaryColor: customization.theme?.primaryColor || customization.primaryColor || defaultCustomization.primaryColor,
+    sidebarColor: customization.theme?.sidebarColor || customization.sidebarColor || defaultCustomization.sidebarColor,
+    backgroundColor: customization.theme?.backgroundColor || customization.backgroundColor || defaultCustomization.backgroundColor,
+    textColor: customization.theme?.textColor || customization.textColor || defaultCustomization.textColor
+  }
+
+  const sidebar = {
+    ...defaultCustomization.sidebar,
+    ...(customization.sidebar || {}),
+    logoUrl: customization.sidebar?.logoUrl || customization.logoUrl || '',
+    brandName: customization.sidebar?.brandName || customization.brandName || defaultCustomization.brandName,
+    title: customization.sidebar?.title || customization.heroTitle || areaName,
+    links: {
+      ...defaultCustomization.sidebar?.links,
+      ...(customization.sidebar?.links || {}),
+      home: customization.sidebar?.links?.home || customization.homeLabel || defaultCustomization.homeLabel,
+      instagram: customization.sidebar?.links?.instagram || customization.instagramLabel || defaultCustomization.instagramLabel,
+      support: customization.sidebar?.links?.support || customization.supportLabel || defaultCustomization.supportLabel
+    }
+  }
+
+  const sections = customization.home?.sections?.length
+    ? customization.home.sections
+    : [{ id: 'modules', type: 'modules', title: customization.modulesTitle || defaultCustomization.modulesTitle || 'Uma seção pode conter módulos', visible: customization.visibleSections ? customization.visibleSections.includes('modules') : true }]
+
+  const home = {
+    ...defaultCustomization.home,
+    ...(customization.home || {}),
+    banner: {
+      ...defaultCustomization.home?.banner,
+      ...(customization.home?.banner || {}),
+      title: customization.home?.banner?.title || customization.heroTitle || areaName,
+      imageUrl: forceFigurinhas ? cleanFigurinhasImage(customization.home?.banner?.imageUrl || customization.bannerUrl || coverFallback) : (customization.home?.banner?.imageUrl || customization.bannerUrl || coverFallback),
+      visible: customization.home?.banner?.visible ?? (customization.visibleSections ? customization.visibleSections.includes('banner') : true)
+    },
+    slides: (customization.home?.slides?.length
+      ? customization.home.slides
+      : [{ id: 'slide-1', title: 'Slide', imageUrl: customization.bannerUrl || coverFallback }]).map((slide, index) => ({
+        ...slide,
+        id: slide.id || `slide-${index + 1}`,
+        title: slide.title || (index === 0 ? 'Slide' : `Slide ${index + 1}`),
+        imageUrl: forceFigurinhas ? cleanFigurinhasImage(slide.imageUrl || customization.bannerUrl || coverFallback) : (slide.imageUrl || customization.bannerUrl || coverFallback)
+      })),
+    sections
+  }
+
+  return {
+    ...defaultCustomization,
+    ...customization,
+    theme,
+    sidebar,
+    home,
+    primaryColor: theme.primaryColor,
+    sidebarColor: theme.sidebarColor,
+    backgroundColor: theme.backgroundColor,
+    textColor: theme.textColor,
+    logoUrl: sidebar.logoUrl,
+    bannerUrl: home.banner.imageUrl,
+    brandName: sidebar.brandName,
+    homeLabel: sidebar.links.home,
+    instagramLabel: sidebar.links.instagram,
+    supportLabel: sidebar.links.support,
+    heroTitle: home.banner.title,
+    modulesTitle: sections.find((section) => section.type === 'modules')?.title || defaultCustomization.modulesTitle,
+    visibleSections: [
+      ...(home.banner.visible ? ['banner'] : []),
+      ...sections.filter((section) => section.visible !== false).map((section) => section.type)
+    ]
+  }
+}
 
 const localStoreKey = (id: string, key: 'settings' | 'customization' | 'groups') => `members-area:${id}:${key}`
 
@@ -76,7 +195,11 @@ const mapMembersAreaFromSupabase = (row: Record<string, any>): MembersArea => ({
   students: row.students || 0,
   coverUrl: row.courses?.[0]?.cover_url || row.cover_url || undefined,
   settings: { ...defaultSettings, ...(row.settings || {}) },
-  customization: { ...defaultCustomization, ...(row.customization || {}) }
+  customization: normalizeCustomization(
+    { ...(row.customization || {}), ...readLocalValue(row.id, 'customization', {}) },
+    row.courses?.[0]?.title || row.title || 'Área de membros',
+    row.courses?.[0]?.cover_url || row.cover_url || ''
+  )
 })
 
 const mapCourseFromSupabase = (row: Record<string, any>): MembersAreaCourse => ({
@@ -244,6 +367,57 @@ export const listMembersAreaGroups = async (membersAreaId: string): Promise<Memb
 export const saveMembersAreaGroups = async (membersAreaId: string, groups: MembersAreaGroup[]) => {
   mockGroupsStore[membersAreaId] = groups
   writeLocalValue(membersAreaId, 'groups', groups)
+
+  try {
+    const supabase = getSupabaseClient()
+    if (!supabase) return groups
+
+    const { data: existing } = await supabase
+      .from('members_area_groups')
+      .select('id')
+      .eq('members_area_id', membersAreaId)
+
+    const nextIds = new Set(groups.map((group) => group.id))
+    const staleIds = (existing || [])
+      .map((group: Record<string, any>) => group.id)
+      .filter((id: string) => !nextIds.has(id))
+
+    if (staleIds.length) {
+      await supabase
+        .from('members_area_groups')
+        .delete()
+        .in('id', staleIds)
+        .eq('members_area_id', membersAreaId)
+    }
+
+    const payload = groups.map((group) => ({
+      id: group.id,
+      members_area_id: membersAreaId,
+      name: group.name,
+      students: Number(group.students || 0),
+      is_default: Boolean(group.isDefault)
+    }))
+
+    if (payload.length) {
+      const { data, error } = await supabase
+        .from('members_area_groups')
+        .upsert(payload, { onConflict: 'id' })
+        .select('id,name,students,is_default')
+        .order('created_at', { ascending: true })
+
+      if (!error && data) {
+        return data.map((row: Record<string, any>) => ({
+          id: row.id,
+          name: row.name || 'Grupo',
+          students: Number(row.students || 0),
+          isDefault: Boolean(row.is_default)
+        }))
+      }
+    }
+  } catch {
+    // Mantem fallback local quando a migration ainda nao foi aplicada.
+  }
+
   return groups
 }
 
@@ -273,7 +447,7 @@ export const saveMembersAreaSettings = async (membersAreaId: string, settings: M
 }
 
 export const saveMembersAreaCustomization = async (membersAreaId: string, customization: MembersAreaCustomization) => {
-  const normalized = { ...defaultCustomization, ...customization }
+  const normalized = normalizeCustomization(customization, customization.heroTitle || customization.home?.banner?.title || 'Área de membros', customization.bannerUrl || customization.home?.banner?.imageUrl || '')
   writeLocalValue(membersAreaId, 'customization', normalized)
 
   try {

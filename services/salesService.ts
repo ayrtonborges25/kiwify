@@ -51,6 +51,7 @@ const formatStatus = (status?: string | null) => {
 const mapSaleFromSupabase = (row: Record<string, any>): Sale => ({
   id: row.id,
   productId: row.product_id || undefined,
+  offerId: row.offer_id || undefined,
   product: row.products?.name || 'Produto',
   customer: row.customer_name || row.customer_email || 'Cliente',
   customerEmail: row.customer_email || undefined,
@@ -192,6 +193,7 @@ export const createSale = async (payload: CreateSalePayload) => {
   const sale: Sale = {
     id: createMockId(),
     productId: payload.productId,
+    offerId: payload.offerId,
     product: payload.productId || 'Produto',
     customer: payload.customerName || payload.customerEmail,
     customerEmail: payload.customerEmail,
