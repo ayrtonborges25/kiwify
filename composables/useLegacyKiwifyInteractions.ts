@@ -394,6 +394,11 @@ export function useLegacyKiwifyInteractions() {
       return
     }
     if (text === 'Excluir produto') {
+      const deleteProductButton = target.closest<HTMLButtonElement>('button')
+      if (deleteProductButton?.textContent?.trim() !== 'Excluir produto') {
+        if (!target.closest('.dropdown')) closeDropdowns()
+        return
+      }
       pendingProductId.value = String(route.params.id || pendingProductId.value || '')
       openModalByTitle('excluir esse produto')
       return
