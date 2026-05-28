@@ -358,7 +358,7 @@ onMounted(loadMembersAreaData)
 
 <template>
   <NuxtPage v-if="route.name === 'members-area-id-editor'" />
-  <KiwifyChrome v-else>
+  <KiwifyChrome v-else :hide-topbar="isEditingContent">
     <div class="container mx-auto px-4 sm:px-8 py-8 lg:py-10 lg:px-20">
       <div v-if="!isEditingContent" class="page-header mb-8" style="height: 42px;">
         <div class="flex items-center">
