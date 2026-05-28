@@ -55,13 +55,15 @@ type EditorState = {
 
 const route = useRoute()
 const { getMembersAreaById, saveMembersAreaCustomization } = useMembersArea()
+const { showSuccessToast, showErrorToast } = useKiwifyToast()
 
 const membersAreaId = computed(() => String(route.params.id || '1cbe33c8-14d3-4612-81e4-b52587203765'))
 const membersArea = computed(() => getMembersAreaById(membersAreaId.value))
 const areaName = computed(() => membersArea.value?.name || 'Figurinhas da Copa 2026')
 const coverUrl = computed(() => membersArea.value?.coverUrl || '')
 const areaPath = computed(() => `/members-area/${membersAreaId.value}?tab=customizations`)
-const publicClubPath = computed(() => `/club=${membersAreaId.value}?editor=1`)
+const previewRefreshKey = ref(0)
+const publicClubPath = computed(() => `/club=${membersAreaId.value}?editor=1&preview=${previewRefreshKey.value}`)
 
 const saving = ref(false)
 const activeTab = ref<'home' | 'menu' | 'login' | 'settings'>('home')
@@ -325,7 +327,7 @@ const moveSection = (id: string, direction: -1 | 1) => {
 const selectedSlide = computed(() => editor.home.slides.find((slide) => slide.id === selectedItem.value))
 const selectedSection = computed(() => editor.home.sections.find((section) => section.id === selectedItem.value))
 const selectedKind = computed(() => selectedItem.value === 'banner' ? 'banner' : selectedSlide.value ? 'slide' : selectedSection.value ? 'section' : 'general')
-const activeBannerImage = computed(() => editor.home.banner.imageUrl || editor.home.slides[0]?.imageUrl)
+const activeBannerImage = computed(() => selectedSlide.value?.imageUrl || editor.home.banner.imageUrl || editor.home.slides[0]?.imageUrl)
 const activePanelTitle = computed(() => {
   if (selectedKind.value === 'banner') return 'Banner'
   if (selectedKind.value === 'slide') return selectedSlide.value?.title || 'Slide'
@@ -363,6 +365,7 @@ const setImageValue = (target: 'banner' | 'slide' | 'section', imageUrl: string)
     if (target === 'slide' && selectedSlide.value) {
       selectedSlide.value.imageUrl = imageUrl
       editor.home.banner.imageUrl = imageUrl
+      if (editor.home.slides[0]) editor.home.slides[0].imageUrl = imageUrl
       return
     }
     if (target === 'section' && selectedSection.value) {
@@ -389,13 +392,20 @@ const handleImageUpload = async (event: Event | DragEvent, target: 'banner' | 's
     return
   }
 
-  const extension = file.name.split('.').pop() || 'png'
-  const key = target === 'slide' ? selectedSlide.value?.id : target === 'section' ? selectedSection.value?.id : 'banner'
-  const uploaded = await uploadFile('member-area-covers', `${membersAreaId.value}/clean-${target}-${key || Date.now()}.${extension}`, file)
-  const imageUrl = uploaded.data?.publicUrl || await readFileAsDataUrl(file)
-  setImageValue(target, imageUrl)
-  await saveMembersAreaCustomization(membersAreaId.value, serializeForSave())
-  if (input?.value !== undefined) input.value = ''
+  try {
+    const extension = file.name.split('.').pop() || 'png'
+    const key = target === 'slide' ? selectedSlide.value?.id : target === 'section' ? selectedSection.value?.id : 'banner'
+    const uploaded = await uploadFile('member-area-covers', `${membersAreaId.value}/clean-${target}-${key || Date.now()}.${extension}`, file)
+    const imageUrl = uploaded.data?.publicUrl || await readFileAsDataUrl(file)
+    setImageValue(target, imageUrl)
+    await saveMembersAreaCustomization(membersAreaId.value, serializeForSave())
+    previewRefreshKey.value += 1
+  } catch {
+    uploadError.value = 'Nao foi possivel enviar a imagem. Tente novamente.'
+    showErrorToast('Nao foi possivel enviar a imagem')
+  } finally {
+    if (input?.value !== undefined) input.value = ''
+  }
 }
 
 const clearImage = (target: 'banner' | 'slide' | 'section') => {
@@ -406,6 +416,10 @@ const saveCustomization = async () => {
   saving.value = true
   try {
     await saveMembersAreaCustomization(membersAreaId.value, serializeForSave())
+    previewRefreshKey.value += 1
+    showSuccessToast('As alterações da área de membros foram salvas')
+  } catch {
+    showErrorToast('Nao foi possivel salvar as alterações')
   } finally {
     saving.value = false
   }
