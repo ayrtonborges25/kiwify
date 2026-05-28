@@ -124,7 +124,7 @@ const sidebarTextColor = computed(() => sidebar.value.textColor || '#111827')
 .club-sidebar__title h1 {
   margin: 0;
   max-width: 216px;
-  font-size: 31px;
+  font-size: 26px;
   font-weight: 400;
   line-height: 1.28;
 }
@@ -149,7 +149,7 @@ const sidebarTextColor = computed(() => sidebar.value.textColor || '#111827')
   gap: 23px;
   color: currentColor;
   text-decoration: none;
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 600;
   line-height: 1.5;
 }
@@ -191,7 +191,7 @@ const sidebarTextColor = computed(() => sidebar.value.textColor || '#111827')
 
 .club-sidebar__account strong {
   flex: 1;
-  font-size: 20px;
+  font-size: 17px;
   line-height: 1.25;
   font-weight: 700;
 }

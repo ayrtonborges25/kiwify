@@ -99,8 +99,8 @@ export type MemberClubData = {
   modules: MemberClubModule[]
 }
 
-export const defaultClubBanner = 'https://aws-assets.kiwify.com.br/Qlf7xYHJBhIz7k6/img_0_Design-sem-nome_c4f6eff966f84e6aa1cc65d4b63d7e3a.png'
-export const defaultFigurinhasModuleImage = 'https://aws-assets.kiwify.com.br/Qlf7xYHJBhIz7k6/Mobile-1_e271e950cb2c496e913cd05907b971e0.png'
+export const defaultClubBanner = ''
+export const defaultFigurinhasModuleImage = ''
 
 const mockModules: MemberClubModule[] = [
   {
@@ -113,72 +113,9 @@ const mockModules: MemberClubModule[] = [
       {
         id: 'welcome-lesson',
         moduleId: 'welcome',
-        title: 'Bem vindos',
-        description: 'Comece por aqui e acompanhe as primeiras instruções do curso.',
-        duration: '03:42',
-        position: 1,
-        status: 'available'
-      }
-    ]
-  },
-  {
-    id: 'install',
-    title: 'Álbum Digital',
-    imageUrl: defaultFigurinhasModuleImage,
-    position: 2,
-    status: 'available',
-    lessons: [
-      {
-        id: 'install-lesson',
-        moduleId: 'install',
-        title: 'Como instalar',
-        description: 'Instale os arquivos e prepare seu ambiente para seguir as aulas.',
-        duration: '07:10',
-        position: 1,
-        status: 'available'
-      },
-      {
-        id: 'install-files',
-        moduleId: 'install',
-        title: 'Arquivos de apoio',
-        description: 'Baixe os materiais de apoio do módulo.',
-        duration: '02:18',
-        position: 2,
-        status: 'available'
-      }
-    ]
-  },
-  {
-    id: 'editing',
-    title: 'Impressão',
-    imageUrl: defaultFigurinhasModuleImage,
-    position: 3,
-    status: 'available',
-    lessons: [
-      {
-        id: 'editing-first',
-        moduleId: 'editing',
-        title: 'Primeiros passos',
-        description: 'Aprenda o fluxo principal de edição.',
-        duration: '12:00',
-        position: 1,
-        status: 'available'
-      }
-    ]
-  },
-  {
-    id: 'bonus',
-    title: 'Bônus',
-    imageUrl: defaultFigurinhasModuleImage,
-    position: 4,
-    status: 'available',
-    lessons: [
-      {
-        id: 'bonus-lesson',
-        moduleId: 'bonus',
-        title: 'Conteúdo bônus',
-        description: 'Conteúdo complementar liberado para alunos.',
-        duration: '05:50',
+        title: 'BAIXE SEUS ARQUIVOS AQUI',
+        description: 'Baixe todos os arquivos neste link\nhttps://drive.google.com/drive...',
+        duration: '',
         position: 1,
         status: 'available'
       }
@@ -198,21 +135,6 @@ export const memberClubMocks: Record<string, MemberClubData> = {
     course: {
       id: 'b156fdb6-0917-4611-b7d1-3f9915102202',
       title: 'Figurinhas da Copa 2026',
-      coverUrl: defaultClubBanner
-    },
-    modules: mockModules
-  },
-  '8718fda1-5d73-484f-9a84-7dd17bb47de5': {
-    club: {
-      id: '8718fda1-5d73-484f-9a84-7dd17bb47de5',
-      title: 'Robô do Lightroom Mobile',
-      brandName: 'RETRATISTAS DIGITAIS',
-      instagramUrl: 'https://instagram.com',
-      supportUrl: 'mailto:suporte@ayrtonborgesonline.com'
-    },
-    course: {
-      id: '3499d88a-a13d-44d9-8659-d6dd463e9e8f',
-      title: 'Robô do Lightroom Mobile',
       coverUrl: defaultClubBanner
     },
     modules: mockModules

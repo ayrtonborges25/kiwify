@@ -46,7 +46,7 @@ const pixels = ref<PixelRow[]>([
   {
     id: 'facebook-pixel-1',
     pixelId: '',
-    domain: 'robodolightroom.com'
+    domain: 'figurinhasdacopa.com'
   }
 ])
 
@@ -100,7 +100,7 @@ const addPixel = () => {
   pixels.value.push({
     id: createId('pixel'),
     pixelId: '',
-    domain: 'robodolightroom.com'
+    domain: 'figurinhasdacopa.com'
   })
 }
 

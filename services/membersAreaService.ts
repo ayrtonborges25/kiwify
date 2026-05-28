@@ -25,7 +25,7 @@ const defaultSettings: MembersAreaSettings = {
   type: 'complete',
   commentsEnabled: false
 }
-const defaultClubBanner = 'https://aws-assets.kiwify.com.br/Qlf7xYHJBhIz7k6/img_0_Design-sem-nome_c4f6eff966f84e6aa1cc65d4b63d7e3a.png'
+const defaultClubBanner = ''
 const defaultCustomization: MembersAreaCustomization = {
   theme: {
     primaryColor: '#4f46e5',
@@ -75,16 +75,19 @@ const defaultCustomization: MembersAreaCustomization = {
   visibleSections: ['banner', 'modules']
 }
 const mockGroupsStore: Record<string, MembersAreaGroup[]> = {}
-const isFigurinhasArea = (areaName = '') => /figurinhas|copa 2026/i.test(areaName)
-const cleanFigurinhasImage = (value = '') => {
-  if (/^(data:image|blob:)/i.test(value) || /member-area-covers/i.test(value)) return value
-  if (!value || /robo|rob[oô]|lightroom|presets|ribas/i.test(value)) return defaultClubBanner
-  return value
+const blockedMemberContentPattern = /robo|rob[oô]|lightroom|presets|ribas/i
+const isCleanMemberAreaUpload = (value = '') => /member-area-covers.*clean-/i.test(value)
+const cleanMembersAreaImage = (value = '') => {
+  if (/^(data:image|blob:)/i.test(value) || isCleanMemberAreaUpload(value)) return value
+  if (value === defaultClubBanner) return value
+  if (!value || blockedMemberContentPattern.test(value)) return ''
+  return ''
 }
+const cleanMembersAreaText = (value = '', fallback = 'Figurinhas da Copa 2026') => blockedMemberContentPattern.test(value) ? fallback : value
 
 const normalizeCustomization = (customization: MembersAreaCustomization = {}, areaName = 'Figurinhas da Copa 2026', coverUrl = ''): MembersAreaCustomization => {
-  const forceFigurinhas = isFigurinhasArea(areaName)
-  const coverFallback = forceFigurinhas ? cleanFigurinhasImage(coverUrl) : (coverUrl || defaultClubBanner)
+  const safeAreaName = cleanMembersAreaText(areaName)
+  const coverFallback = cleanMembersAreaImage(coverUrl)
   const theme = {
     ...defaultCustomization.theme,
     ...(customization.theme || {}),
@@ -98,8 +101,8 @@ const normalizeCustomization = (customization: MembersAreaCustomization = {}, ar
     ...defaultCustomization.sidebar,
     ...(customization.sidebar || {}),
     logoUrl: customization.sidebar?.logoUrl || customization.logoUrl || '',
-    brandName: customization.sidebar?.brandName || customization.brandName || defaultCustomization.brandName,
-    title: customization.sidebar?.title || customization.heroTitle || areaName,
+    brandName: cleanMembersAreaText(customization.sidebar?.brandName || customization.brandName || defaultCustomization.brandName || 'RETRATISTAS DIGITAIS', 'RETRATISTAS DIGITAIS'),
+    title: cleanMembersAreaText(customization.sidebar?.title || customization.heroTitle || safeAreaName),
     links: {
       ...defaultCustomization.sidebar?.links,
       ...(customization.sidebar?.links || {}),
@@ -119,8 +122,8 @@ const normalizeCustomization = (customization: MembersAreaCustomization = {}, ar
     banner: {
       ...defaultCustomization.home?.banner,
       ...(customization.home?.banner || {}),
-      title: customization.home?.banner?.title || customization.heroTitle || areaName,
-      imageUrl: forceFigurinhas ? cleanFigurinhasImage(customization.home?.banner?.imageUrl || customization.bannerUrl || coverFallback) : (customization.home?.banner?.imageUrl || customization.bannerUrl || coverFallback),
+      title: cleanMembersAreaText(customization.home?.banner?.title || customization.heroTitle || safeAreaName),
+      imageUrl: cleanMembersAreaImage(customization.home?.banner?.imageUrl || customization.bannerUrl || coverFallback),
       visible: customization.home?.banner?.visible ?? (customization.visibleSections ? customization.visibleSections.includes('banner') : true)
     },
     slides: (customization.home?.slides?.length
@@ -129,7 +132,7 @@ const normalizeCustomization = (customization: MembersAreaCustomization = {}, ar
         ...slide,
         id: slide.id || `slide-${index + 1}`,
         title: slide.title || (index === 0 ? 'Slide' : `Slide ${index + 1}`),
-        imageUrl: forceFigurinhas ? cleanFigurinhasImage(slide.imageUrl || customization.bannerUrl || coverFallback) : (slide.imageUrl || customization.bannerUrl || coverFallback)
+        imageUrl: cleanMembersAreaImage(slide.imageUrl || customization.bannerUrl || coverFallback)
       })),
     sections
   }
@@ -146,11 +149,11 @@ const normalizeCustomization = (customization: MembersAreaCustomization = {}, ar
     textColor: theme.textColor,
     logoUrl: sidebar.logoUrl,
     bannerUrl: home.banner.imageUrl,
-    brandName: sidebar.brandName,
+    brandName: cleanMembersAreaText(sidebar.brandName, 'RETRATISTAS DIGITAIS'),
     homeLabel: sidebar.links.home,
     instagramLabel: sidebar.links.instagram,
     supportLabel: sidebar.links.support,
-    heroTitle: home.banner.title,
+    heroTitle: cleanMembersAreaText(home.banner.title),
     modulesTitle: sections.find((section) => section.type === 'modules')?.title || defaultCustomization.modulesTitle,
     visibleSections: [
       ...(home.banner.visible ? ['banner'] : []),
@@ -189,29 +192,29 @@ const createMockId = () => {
 
 const mapMembersAreaFromSupabase = (row: Record<string, any>): MembersArea => ({
   id: row.id,
-  name: row.courses?.[0]?.title || row.title || 'Área de membros',
+  name: cleanMembersAreaText(row.courses?.[0]?.title || row.title || 'Área de membros'),
   courseId: row.courses?.[0]?.id || row.course_id || '',
   productId: row.product_id || row.courses?.[0]?.product_id || undefined,
   students: row.students || 0,
-  coverUrl: row.courses?.[0]?.cover_url || row.cover_url || undefined,
+  coverUrl: cleanMembersAreaImage(row.courses?.[0]?.cover_url || row.cover_url || ''),
   settings: { ...defaultSettings, ...(row.settings || {}) },
   customization: normalizeCustomization(
     { ...(row.customization || {}), ...readLocalValue(row.id, 'customization', {}) },
-    row.courses?.[0]?.title || row.title || 'Área de membros',
+    cleanMembersAreaText(row.courses?.[0]?.title || row.title || 'Área de membros'),
     row.courses?.[0]?.cover_url || row.cover_url || ''
   )
 })
 
 const mapCourseFromSupabase = (row: Record<string, any>): MembersAreaCourse => ({
   id: row.id,
-  title: row.title || 'Curso',
+  title: cleanMembersAreaText(row.title || 'Curso', 'Curso'),
   description: row.description || '',
   productId: row.product_id || undefined,
-  coverUrl: row.cover_url || undefined
+  coverUrl: cleanMembersAreaImage(row.cover_url || '')
 })
 
 const mapModuleFromSupabase = (row: Record<string, any>): MembersAreaModule => ({
-  title: row.title || 'Modulo',
+  title: cleanMembersAreaText(row.title || 'Modulo', 'Modulo'),
   lessons: row.lessons?.length || 0,
   status: row.status || 'Publicado'
 })
@@ -292,7 +295,7 @@ export const listMembersAreaStudents = async (membersAreaId: string): Promise<Me
       return [
         { id: 'student-1', name: 'Danielle Dias Ferreira dos santos', email: 'dani_dfs88@hotmail.com', lastAccess: '22/05/2026 18:44', progress: 0 },
         { id: 'student-2', name: 'RETRATISTAS DIGITAIS', email: 'ayrtonborgesfotografias@hotmail.com', lastAccess: '21/05/2026 11:11', progress: 100, isCurrentUser: true },
-        { id: 'student-3', name: 'Henrique Ribas', email: 'henrique@email.com', lastAccess: '20/05/2026 09:20', progress: 0 }
+        { id: 'student-3', name: 'Retratistas Digitais', email: 'henrique@email.com', lastAccess: '20/05/2026 09:20', progress: 0 }
       ]
     }
 

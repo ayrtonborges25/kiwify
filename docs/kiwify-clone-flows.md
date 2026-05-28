@@ -246,7 +246,7 @@ Arquivos principais:
 Variaveis necessarias:
 
 - `ASAAS_API_KEY`
-- `ASAAS_BASE_URL=https://sandbox.asaas.com/api/v3`
+- `ASAAS_BASE_URL=https://api.asaas.com/v3`
 - `ASAAS_WEBHOOK_TOKEN`, opcional para validar o webhook.
 - `SUPABASE_SERVICE_ROLE_KEY` opcional no servidor; se ausente, o server usa a anon key e as policies publicas.
 - `RESEND_API_KEY`

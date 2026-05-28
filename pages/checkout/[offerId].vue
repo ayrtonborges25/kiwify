@@ -213,8 +213,6 @@ useHead({
           </div>
 
           <section id="checkoutblock" class="checkoutblock">
-            <button type="button" class="apple-pay-button">Pagar com <strong>Pay</strong></button>
-            <div class="checkout-divider"><span>ou</span></div>
             <div class="country-row">
               <span class="country-flag">🇧🇷</span>
               <span>Alterar país</span>
@@ -429,44 +427,6 @@ useHead({
 
 .pb-3 {
   padding-bottom: 12px;
-}
-
-.apple-pay-button {
-  width: 400px;
-  min-width: 0;
-  min-height: 44px;
-  display: block;
-  margin: 12px auto;
-  border: 0;
-  border-radius: 6px;
-  background: #000;
-  color: #fff;
-  font-size: 18px;
-  font-weight: 500;
-  cursor: pointer;
-  line-height: 1;
-  padding: 12px 16px;
-}
-
-.apple-pay-button strong {
-  font-size: 20px;
-}
-
-.checkout-divider {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  color: #9ca3af;
-  font-size: 12px;
-  margin: 16px 0 8px;
-}
-
-.checkout-divider::before,
-.checkout-divider::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: #e5e7eb;
 }
 
 .country-row {
@@ -740,11 +700,6 @@ useHead({
 
   .checkoutblock {
     padding: 24px 18px;
-  }
-
-  .apple-pay-button {
-    min-width: 0;
-    width: 100%;
   }
 
   .card-field-grid {

@@ -19,6 +19,14 @@ const normalizeConfiguredUrl = (url?: string | null) => {
   return `https://${value}`
 }
 
+const withSaleId = (url: string, saleId: string) => {
+  if (!url) return ''
+  if (url.includes('{saleId}')) return url.replaceAll('{saleId}', saleId)
+  if (url.startsWith('#')) return url
+  const separator = url.includes('?') ? '&' : '?'
+  return `${url}${separator}saleId=${encodeURIComponent(saleId)}`
+}
+
 export const resolveApprovedRedirect = async (
   supabase: SupabaseLike,
   sale: SaleRedirectInput,
@@ -44,11 +52,12 @@ export const resolveApprovedRedirect = async (
 
   const thankYouUrl = normalizeConfiguredUrl(settings?.thank_you_url)
   const usesThankYou = Boolean(settings?.thank_you_enabled && thankYouUrl)
+  const resolvedThankYouUrl = usesThankYou ? withSaleId(thankYouUrl, sale.id) : ''
 
   return {
-    accessUrl: usesThankYou ? `/thank-you/${sale.id}` : clubUrl,
+    accessUrl: usesThankYou ? resolvedThankYouUrl : clubUrl,
     clubUrl,
-    thankYouUrl: usesThankYou ? thankYouUrl : '',
+    thankYouUrl: resolvedThankYouUrl,
     usesThankYou
   }
 }

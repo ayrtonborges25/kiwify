@@ -28,12 +28,12 @@ let videoInput: HTMLInputElement | null = null
 let modalRoot: HTMLDivElement | null = null
 
 const selectOptions: Record<string, string[]> = {
-  domain: ['robodolightroom.com', 'digitalborges.com.br', 'kiwify-mock.com'],
-  members: ['Figurinhas da Copa 2026', 'Robô do Lightroom Mobile', 'Clube dos Fotógrafos - Ayrton Borges'],
-  product: ['Todos os produtos', 'Figurinhas da Copa 2026', 'Robô do Lightroom Mobile', 'Clube dos Fotógrafos - Ayrton Borges'],
+  domain: ['figurinhasdacopa.com', 'digitalborges.com.br', 'kiwify-mock.com'],
+  members: ['Figurinhas da Copa 2026', 'Clube dos Fotógrafos - Ayrton Borges'],
+  product: ['Todos os produtos', 'Figurinhas da Copa 2026', 'Clube dos Fotógrafos - Ayrton Borges'],
   type: ['Todos', 'Pago', 'Recusado', 'Reembolsado', 'Chargeback'],
   offer: ['Todas as ofertas', 'Checkout A', 'Oferta principal'],
-  affiliate: ['Selecione um afiliado (buscar)', 'Ayrton Borges', 'Henrique Ribas']
+  affiliate: ['Selecione um afiliado (buscar)', 'Ayrton Borges', 'Retratistas Digitais']
 }
 
 const getText = (element: Element | null) => element?.textContent?.replace(/\s+/g, ' ').trim() || ''
@@ -331,7 +331,7 @@ export function useComplexFieldMocks() {
         applyImageToSurface(file.key, file.url)
         if (file.key === 'members-cover' && file.file && route.params.id) {
           const extension = file.file.name.split('.').pop() || 'png'
-          const uploaded = await uploadFile('member-area-covers', `${String(route.params.id)}/cover.${extension}`, file.file)
+          const uploaded = await uploadFile('member-area-covers', `${String(route.params.id)}/clean-cover.${extension}`, file.file)
           if (uploaded.data?.publicUrl) {
             applyImageToSurface(file.key, uploaded.data.publicUrl)
             await updateMembersArea(String(route.params.id), { coverUrl: uploaded.data.publicUrl })

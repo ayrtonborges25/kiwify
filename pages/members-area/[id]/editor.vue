@@ -77,16 +77,18 @@ const redoStack = ref<string[]>([])
 const historyLocked = ref(false)
 const uploadError = ref('')
 
-const defaultBanner = 'https://aws-assets.kiwify.com.br/Qlf7xYHJBhIz7k6/img_0_Design-sem-nome_c4f6eff966f84e6aa1cc65d4b63d7e3a.png'
-const defaultFigurinhasModuleImage = 'https://aws-assets.kiwify.com.br/Qlf7xYHJBhIz7k6/Mobile-1_e271e950cb2c496e913cd05907b971e0.png'
-const isFigurinhasEditor = computed(() => membersAreaId.value === '1cbe33c8-14d3-4612-81e4-b52587203765' || membersAreaId.value === 'c6d46bd7-9ced-4fb2-a4a0-ae033e3b612a' || /figurinhas|copa 2026/i.test(areaName.value))
+const defaultBanner = ''
+const defaultFigurinhasModuleImage = ''
+const blockedMemberAssetPattern = /robo|rob[oô]|lightroom|presets|ribas/i
+const isCleanMemberAreaUpload = (value = '') => /member-area-covers.*clean-/i.test(value)
 const safeEditorImage = (value = '', fallback = defaultBanner) => {
-  if (!isFigurinhasEditor.value) return value || fallback
-  if (/^(data:image|blob:)/i.test(value) || /member-area-covers/i.test(value)) return value
-  if (/robo|rob[oô]|lightroom|presets|ribas/i.test(value)) return fallback
+  if (/^(data:image|blob:)/i.test(value) || isCleanMemberAreaUpload(value)) return value
+  if (value === defaultBanner || value === defaultFigurinhasModuleImage) return value
+  if (blockedMemberAssetPattern.test(value)) return fallback
   if (fallback === defaultFigurinhasModuleImage) return defaultFigurinhasModuleImage
-  return value || defaultBanner
+  return fallback || ''
 }
+const safeEditorText = (value = '', fallback = 'Figurinhas da Copa 2026') => blockedMemberAssetPattern.test(value) ? fallback : value
 
 const createState = (): EditorState => ({
   theme: {
@@ -98,7 +100,7 @@ const createState = (): EditorState => ({
   sidebar: {
     logoUrl: '',
     brandName: 'RETRATISTAS DIGITAIS',
-    title: areaName.value,
+    title: safeEditorText(areaName.value),
     collapsed: false,
     links: {
       home: 'Home',
@@ -110,7 +112,7 @@ const createState = (): EditorState => ({
   },
   home: {
     banner: {
-      title: areaName.value,
+      title: safeEditorText(areaName.value),
       imageUrl: safeEditorImage(coverUrl.value, defaultBanner),
       visible: true
     },
@@ -152,7 +154,7 @@ const normalizeCustomization = (customization: MembersAreaCustomization = {}): E
     ...(customization.sidebar || {}),
     logoUrl: customization.sidebar?.logoUrl || customization.logoUrl || base.sidebar.logoUrl,
     brandName: customization.sidebar?.brandName || customization.brandName || base.sidebar.brandName,
-    title: customization.sidebar?.title || customization.heroTitle || base.sidebar.title,
+    title: safeEditorText(customization.sidebar?.title || customization.heroTitle || base.sidebar.title),
     links: sidebarLinks
   }
   const sections = (customization.home?.sections?.length ? customization.home.sections : base.home.sections).map((section) => ({
@@ -169,7 +171,7 @@ const normalizeCustomization = (customization: MembersAreaCustomization = {}): E
     banner: {
       ...base.home.banner,
       ...(customization.home?.banner || {}),
-      title: customization.home?.banner?.title || customization.heroTitle || base.home.banner.title,
+      title: safeEditorText(customization.home?.banner?.title || customization.heroTitle || base.home.banner.title),
       imageUrl: safeEditorImage(customization.home?.banner?.imageUrl || customization.bannerUrl || coverUrl.value, defaultBanner),
       visible: customization.home?.banner?.visible ?? (customization.visibleSections ? customization.visibleSections.includes('banner') : true)
     },
@@ -355,11 +357,12 @@ const setImageValue = (target: 'banner' | 'slide' | 'section', imageUrl: string)
   mutate(() => {
     if (target === 'banner') {
       editor.home.banner.imageUrl = imageUrl
-      editor.home.slides[0].imageUrl = imageUrl
+      if (editor.home.slides[0]) editor.home.slides[0].imageUrl = imageUrl
       return
     }
     if (target === 'slide' && selectedSlide.value) {
       selectedSlide.value.imageUrl = imageUrl
+      editor.home.banner.imageUrl = imageUrl
       return
     }
     if (target === 'section' && selectedSection.value) {
@@ -388,14 +391,15 @@ const handleImageUpload = async (event: Event | DragEvent, target: 'banner' | 's
 
   const extension = file.name.split('.').pop() || 'png'
   const key = target === 'slide' ? selectedSlide.value?.id : target === 'section' ? selectedSection.value?.id : 'banner'
-  const uploaded = await uploadFile('member-area-covers', `${membersAreaId.value}/${target}-${key || Date.now()}.${extension}`, file)
+  const uploaded = await uploadFile('member-area-covers', `${membersAreaId.value}/clean-${target}-${key || Date.now()}.${extension}`, file)
   const imageUrl = uploaded.data?.publicUrl || await readFileAsDataUrl(file)
   setImageValue(target, imageUrl)
+  await saveMembersAreaCustomization(membersAreaId.value, serializeForSave())
   if (input?.value !== undefined) input.value = ''
 }
 
 const clearImage = (target: 'banner' | 'slide' | 'section') => {
-  setImageValue(target, '')
+  setImageValue(target, target === 'section' ? defaultFigurinhasModuleImage : defaultBanner)
 }
 
 const saveCustomization = async () => {

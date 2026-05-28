@@ -80,7 +80,7 @@ const mapDelivery = (row: Record<string, any> | null | undefined) => {
 const asaasFetch = async <T>(path: string) => {
   const config = useRuntimeConfig()
   const apiKey = String(config.asaasApiKey || '')
-  const baseUrl = String(config.asaasBaseUrl || 'https://sandbox.asaas.com/api/v3').replace(/\/$/, '')
+  const baseUrl = String(config.asaasBaseUrl || 'https://api.asaas.com/v3').replace(/\/$/, '')
 
   if (!apiKey) {
     throw createError({

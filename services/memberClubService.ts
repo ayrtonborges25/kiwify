@@ -1,5 +1,5 @@
 import { getSupabaseClient } from '~/utils/supabase'
-import { defaultClubBanner, getMockMemberClub, type MemberClubData, type MemberClubLesson, type MemberClubModule } from '~/data/memberClub'
+import { defaultClubBanner, defaultFigurinhasModuleImage, getMockMemberClub, type MemberClubData, type MemberClubLesson, type MemberClubModule } from '~/data/memberClub'
 
 const byPosition = <T extends { position?: number }>(a: T, b: T) => Number(a.position || 0) - Number(b.position || 0)
 const localCustomizationKey = (id: string) => `members-area:${id}:customization`
@@ -9,12 +9,16 @@ const figurinhasAreaIds = new Set([
 ])
 
 const isFigurinhasArea = (id = '', title = '') => figurinhasAreaIds.has(id) || /figurinhas|copa 2026/i.test(title)
-const isWrongLightroomAsset = (value = '') => /robo|rob[oô]|lightroom|presets|ribas/i.test(value)
-const cleanFigurinhasImage = (value = '') => {
-  if (/^(data:image|blob:)/i.test(value) || /member-area-covers/i.test(value)) return value
-  if (!value || isWrongLightroomAsset(value)) return defaultClubBanner
-  return value
+const blockedMemberContentPattern = /robo|rob[oô]|lightroom|presets|ribas/i
+const isCleanMemberAreaUpload = (value = '') => /member-area-covers.*clean-/i.test(value)
+const cleanMemberClubImage = (value = '', fallback = '') => {
+  if (/^(data:image|blob:)/i.test(value)) return value
+  if (isCleanMemberAreaUpload(value)) return value
+  if (value === defaultClubBanner || value === defaultFigurinhasModuleImage) return value
+  if (!value || blockedMemberContentPattern.test(value)) return fallback
+  return fallback
 }
+const cleanMemberClubText = (value = '', fallback = 'Figurinhas da Copa 2026') => blockedMemberContentPattern.test(value) ? fallback : value
 
 const readLocalCustomization = (id: string) => {
   if (!process.client) return {}
@@ -26,11 +30,10 @@ const readLocalCustomization = (id: string) => {
   }
 }
 
-const normalizeCustomization = (customization: Record<string, any> = {}, fallbackTitle = 'Área de membros', fallbackCover = '', forceFigurinhas = false) => {
-  const coverFallback = forceFigurinhas ? cleanFigurinhasImage(fallbackCover) : (fallbackCover || defaultClubBanner)
-  const bannerImage = forceFigurinhas
-    ? cleanFigurinhasImage(customization.home?.banner?.imageUrl || customization.bannerUrl || coverFallback)
-    : (customization.home?.banner?.imageUrl || customization.bannerUrl || coverFallback)
+const normalizeCustomization = (customization: Record<string, any> = {}, fallbackTitle = 'Área de membros', fallbackCover = '') => {
+  const safeFallbackTitle = cleanMemberClubText(fallbackTitle)
+  const coverFallback = cleanMemberClubImage(fallbackCover)
+  const bannerImage = cleanMemberClubImage(customization.home?.banner?.imageUrl || customization.bannerUrl || coverFallback, coverFallback)
   const theme = {
     primaryColor: customization.theme?.primaryColor || customization.primaryColor || '#4f46e5',
     sidebarColor: customization.theme?.sidebarColor || customization.sidebarColor || '#facc15',
@@ -39,8 +42,8 @@ const normalizeCustomization = (customization: Record<string, any> = {}, fallbac
   }
   const sidebar = {
     logoUrl: customization.sidebar?.logoUrl || customization.logoUrl || '',
-    brandName: customization.sidebar?.brandName || customization.brandName || 'RETRATISTAS DIGITAIS',
-    title: customization.sidebar?.title || customization.heroTitle || fallbackTitle,
+    brandName: cleanMemberClubText(customization.sidebar?.brandName || customization.brandName || 'RETRATISTAS DIGITAIS', 'RETRATISTAS DIGITAIS'),
+    title: cleanMemberClubText(customization.sidebar?.title || customization.heroTitle || safeFallbackTitle),
     collapsed: Boolean(customization.sidebar?.collapsed),
     links: {
       home: customization.sidebar?.links?.home || customization.homeLabel || 'Home',
@@ -52,7 +55,7 @@ const normalizeCustomization = (customization: Record<string, any> = {}, fallbac
   }
   const home = {
     banner: {
-      title: customization.home?.banner?.title || customization.heroTitle || fallbackTitle,
+      title: cleanMemberClubText(customization.home?.banner?.title || customization.heroTitle || safeFallbackTitle),
       imageUrl: bannerImage,
       visible: customization.home?.banner?.visible ?? (customization.visibleSections ? customization.visibleSections.includes('banner') : true)
     },
@@ -62,7 +65,7 @@ const normalizeCustomization = (customization: Record<string, any> = {}, fallbac
         ...slide,
         id: slide.id || `slide-${index + 1}`,
         title: slide.title || (index === 0 ? 'Slide' : `Slide ${index + 1}`),
-        imageUrl: forceFigurinhas ? cleanFigurinhasImage(slide.imageUrl || customization.bannerUrl || coverFallback) : (slide.imageUrl || customization.bannerUrl || coverFallback)
+        imageUrl: cleanMemberClubImage(slide.imageUrl || customization.bannerUrl || coverFallback, coverFallback)
       })),
     sections: customization.home?.sections?.length
       ? customization.home.sections
@@ -84,7 +87,7 @@ const normalizeCustomization = (customization: Record<string, any> = {}, fallbac
     homeLabel: sidebar.links.home,
     instagramLabel: sidebar.links.instagram,
     supportLabel: sidebar.links.support,
-    heroTitle: home.banner.title,
+    heroTitle: cleanMemberClubText(home.banner.title),
     modulesTitle: home.sections.find((section: Record<string, any>) => section.type === 'modules')?.title || 'Uma seção pode conter módulos'
   }
 }
@@ -116,9 +119,9 @@ const normalizeModule = (
 
   return {
     id,
-    title: row.title || `Módulo ${index + 1}`,
+    title: cleanMemberClubText(row.title || `Módulo ${index + 1}`, `Módulo ${index + 1}`),
     description: row.description || '',
-    imageUrl: row.cover_url || row.image_url || courseCoverUrl || '',
+    imageUrl: cleanMemberClubImage(row.cover_url || row.image_url || courseCoverUrl || defaultFigurinhasModuleImage),
     position: Number(row.position ?? index + 1),
     status: String(row.status || 'Publicado').toLowerCase().includes('bloque')
       ? 'locked'
@@ -220,28 +223,31 @@ export const getMemberClubById = async (clubId: string): Promise<MemberClubData>
     const forceFigurinhas = isFigurinhasArea(area.id, `${area.title || ''} ${primaryCourse.title || ''} ${fallback.club.title || ''}`)
     const customization = normalizeCustomization(
       { ...(area.customization || {}), ...readLocalCustomization(area.id) },
-      forceFigurinhas ? fallback.club.title : (area.title || primaryCourse.title || fallback.club.title),
-      forceFigurinhas ? fallback.course.coverUrl || defaultClubBanner : (primaryCourse.cover_url || area.cover_url || ''),
-      forceFigurinhas
+      forceFigurinhas ? fallback.club.title : cleanMemberClubText(area.title || primaryCourse.title || fallback.club.title),
+      primaryCourse.cover_url || area.cover_url || fallback.course.coverUrl || defaultClubBanner
     )
-    const safeModules = forceFigurinhas ? fallback.modules : (modules.length ? modules : fallback.modules)
+    const safeModules = (modules.length ? modules : fallback.modules).map((module) => ({
+      ...module,
+      title: cleanMemberClubText(module.title, 'Módulo'),
+      imageUrl: cleanMemberClubImage(module.imageUrl || defaultFigurinhasModuleImage)
+    }))
 
     return {
       club: {
         id: area.id,
-        title: forceFigurinhas ? fallback.club.title : (customization.sidebar?.title || customization.heroTitle || area.title || primaryCourse.title || fallback.club.title),
+        title: forceFigurinhas ? fallback.club.title : cleanMemberClubText(customization.sidebar?.title || customization.heroTitle || area.title || primaryCourse.title || fallback.club.title),
         subtitle: area.description || '',
         instagramUrl: customization.sidebar?.links?.instagramUrl || area.instagram_url || fallback.club.instagramUrl,
         supportUrl: customization.sidebar?.links?.supportUrl || area.support_url || fallback.club.supportUrl,
-        brandName: customization.sidebar?.brandName || customization.brandName || area.brand_name || fallback.club.brandName,
+        brandName: cleanMemberClubText(customization.sidebar?.brandName || customization.brandName || area.brand_name || fallback.club.brandName, 'RETRATISTAS DIGITAIS'),
         logoUrl: customization.sidebar?.logoUrl || customization.logoUrl || area.logo_url || '',
         customization
       },
       course: {
         id: forceFigurinhas ? fallback.course.id : primaryCourse.id,
-        title: forceFigurinhas ? fallback.course.title : (primaryCourse.title || area.title || fallback.course.title),
+        title: forceFigurinhas ? fallback.course.title : cleanMemberClubText(primaryCourse.title || area.title || fallback.course.title),
         description: primaryCourse.description || area.description || '',
-        coverUrl: customization.home?.banner?.imageUrl || customization.bannerUrl || (forceFigurinhas ? fallback.course.coverUrl : primaryCourse.cover_url || area.cover_url || '')
+        coverUrl: cleanMemberClubImage(customization.home?.banner?.imageUrl || customization.bannerUrl || primaryCourse.cover_url || area.cover_url || fallback.course.coverUrl || defaultClubBanner)
       },
       modules: safeModules
     }

@@ -17,7 +17,6 @@ const groupOptions = [
   { value: '59beff5a-6412-4827-a7b8-8ded9b9c4747', label: 'Área de membros' },
   { value: '5d4c130f-03f6-4450-b212-ca2d1fb37116', label: '[COPY] Retratista Digital - NETCLIK' },
   { value: 'b547f044-2d30-4b5f-a68c-d2ac29df5913', label: 'La Casa de Pincél - Por Ayrton Borges' },
-  { value: 'e21a6846-1cca-4771-8d37-7e2af0e98f4b', label: '[COPY] Robô do Lightroom -  Por Henrique Ribas' },
   { value: 'e7bfbfb7-a557-450e-a6c0-857082023a88', label: 'Clube dos fotógrafos' },
   { value: 'e8a05a98-85bd-48a9-8d34-6a47afe5be00', label: '[COPY] Orçamento FODA - para fotógrafos' }
 ]
