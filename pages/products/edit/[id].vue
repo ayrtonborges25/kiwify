@@ -87,6 +87,8 @@ const readGeneralForm = () => {
 }
 const readSettingsForm = () => {
   const settings = document.querySelector<HTMLElement>('#settings')
+  const thankYouSwitch = settings?.querySelector<HTMLElement>('[data-setting="thank-you-enabled"]')
+  const thankYouUrl = settings?.querySelector<HTMLInputElement>('[data-setting="thank-you-url"]')
   const paymentMethod = settings?.querySelector<HTMLSelectElement>('[data-setting="payment-method"]')?.value || '3'
   const installments = Number(settings?.querySelector<HTMLSelectElement>('[data-setting="installments"]')?.value || 12) || 12
   const boletoValidityDays = Number(settings?.querySelector<HTMLInputElement>('[data-setting="boleto-validity-days"]')?.value || 3) || 3
@@ -104,7 +106,9 @@ const readSettingsForm = () => {
     repeatEmailEnabled: Boolean(productEditToggleState['Pedir para o comprador repetir o e-mail']),
     collectAddressEnabled: Boolean(productEditToggleState['Coletar o endereço do comprador']),
     collectInstagramEnabled: Boolean(productEditToggleState['Coletar o Instagram do comprador']),
-    autoCurrencyEnabled: Boolean(productEditToggleState['Conversão automática de moedas (recomendado)'])
+    autoCurrencyEnabled: Boolean(productEditToggleState['Conversão automática de moedas (recomendado)']),
+    thankYouEnabled: thankYouSwitch ? thankYouSwitch.getAttribute('aria-checked') === 'true' : Boolean(product.value?.settings?.thankYouEnabled),
+    thankYouUrl: thankYouUrl ? thankYouUrl.value.trim() : product.value?.settings?.thankYouUrl
   }
 }
 const hydrateProductForm = async () => {

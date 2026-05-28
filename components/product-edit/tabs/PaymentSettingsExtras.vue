@@ -287,7 +287,7 @@ onBeforeUnmount(() => {
             <div class="px-4 py-5 bg-white sm:p-6 rounded-lg">
               <div class="flex item-center">
                 <div class="flex items-center" @click.stop.prevent="toggleThankYou">
-                  <span role="checkbox" tabindex="0" :aria-checked="thankYouEnabled" :class="switchRootClass(thankYouEnabled)" @keydown.enter.prevent="toggleThankYou" @keydown.space.prevent="toggleThankYou">
+                  <span data-setting="thank-you-enabled" role="checkbox" tabindex="0" :aria-checked="thankYouEnabled" :class="switchRootClass(thankYouEnabled)" @keydown.enter.prevent="toggleThankYou" @keydown.space.prevent="toggleThankYou">
                     <span aria-hidden="true" :class="switchMarkClass(thankYouEnabled)"></span>
                   </span>
                   <label class="block text-sm font-medium leading-5 text-gray-700 ml-2 cursor-pointer">Esse produto tem uma página de obrigado personalizada ou upsell</label>
@@ -301,7 +301,7 @@ onBeforeUnmount(() => {
                       <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="24px" height="24px" class="w-5 h-5 text-gray-400"><path fill-rule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clip-rule="evenodd"></path></svg>
                       </div>
-                      <input v-model="thankYouUrl" placeholder="https://example.com/checkout" class="form-input block w-full pl-10 sm:text-sm sm:leading-5">
+                      <input v-model="thankYouUrl" data-setting="thank-you-url" placeholder="https://example.com/checkout" class="form-input block w-full pl-10 sm:text-sm sm:leading-5">
                     </div>
                   </div>
                 </div>
