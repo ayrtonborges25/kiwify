@@ -597,7 +597,7 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </div>
-        <div class="px-4 py-5 sm:px-6 scroll-upsell">
+        <div data-v-36ced986="" class="px-4 py-5 sm:px-6 scroll-upsell">
           <div class="sm:grid sm:grid-cols-3 sm:gap-4 sm:items-start py-2">
             <label class="text-sm font-medium flex items-center leading-5 text-gray-700 sm:mt-px sm:pt-2">Produto upsell</label>
             <div class="mt-1 sm:mt-0 sm:col-span-2">
