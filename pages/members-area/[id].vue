@@ -360,7 +360,7 @@ onMounted(loadMembersAreaData)
   <NuxtPage v-if="route.name === 'members-area-id-editor'" />
   <KiwifyChrome v-else>
     <div class="container mx-auto px-4 sm:px-8 py-8 lg:py-10 lg:px-20">
-      <div class="page-header mb-8" style="height: 42px;">
+      <div v-if="!isEditingContent" class="page-header mb-8" style="height: 42px;">
         <div class="flex items-center">
           <button type="button" class="mr-4 text-gray-900 focus:outline-none cursor-pointer" @click="goBack">
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-8 w-8"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
@@ -373,7 +373,7 @@ onMounted(loadMembersAreaData)
         </NuxtLink>
       </div>
 
-      <div class="w-full bg-gray-50 rounded-lg shadow">
+      <div v-if="!isEditingContent" class="w-full bg-gray-50 rounded-lg shadow">
         <div class="md:hidden">
           <select :value="activeTab" class="mt-1 form-select block w-full pl-3 pr-10 py-2 text-base leading-6 border-gray-300 focus:outline-none focus:shadow-outline-blue focus:border-blue-300 sm:text-sm sm:leading-5 transition ease-in-out duration-150" @change="router.push(tabPath(($event.target as HTMLSelectElement).value))">
             <option value="courses">Cursos</option>
@@ -641,7 +641,7 @@ onMounted(loadMembersAreaData)
       </template>
 
       <template v-else-if="isEditingContent">
-        <div class="mt-10 flex justify-between items-center">
+        <div class="mt-2 flex justify-between items-center">
           <div class="flex items-center">
             <button type="button" class="mr-4 text-gray-900 focus:outline-none cursor-pointer" @click="closeLessonEditor">
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-8 w-8"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
@@ -651,12 +651,12 @@ onMounted(loadMembersAreaData)
           <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 border-transparent focus:border-indigo-700 focus:shadow-outline-indigo leading-5 text-sm px-6 py-3 gap-2 cursor-pointer shadow-sm" @click="saveContent">Salvar alterações</button>
         </div>
 
-        <div class="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <div class="mt-12 grid grid-cols-1 lg:grid-cols-[minmax(300px,0.9fr)_minmax(620px,2fr)] gap-10">
           <div>
             <h3 class="text-lg font-medium leading-6 text-gray-900">Detalhes do conteúdo</h3>
             <p class="mt-2 text-sm leading-5 text-gray-500">Aprenda mais sobre o <a href="#" class="text-indigo-500 underline">upload de vídeos</a></p>
           </div>
-          <div class="lg:col-span-2 bg-white rounded-lg p-6 space-y-8">
+          <div class="bg-white rounded-lg p-6 space-y-8 min-w-0">
             <div>
               <label class="block text-sm font-medium leading-5 text-gray-700 mb-2">Título</label>
               <input v-model="lessonForm.title" class="form-input block w-full py-3 px-4 border border-gray-300 rounded-md shadow-sm text-sm leading-5">
@@ -710,11 +710,11 @@ onMounted(loadMembersAreaData)
           </div>
         </div>
 
-        <div class="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <div class="mt-12 grid grid-cols-1 lg:grid-cols-[minmax(300px,0.9fr)_minmax(620px,2fr)] gap-10">
           <div>
             <h3 class="text-lg font-medium leading-6 text-gray-900">Editor de conteúdo</h3>
           </div>
-          <div class="lg:col-span-2 bg-white rounded-lg p-6">
+          <div class="bg-white rounded-lg p-6 min-w-0">
             <div class="border border-gray-200">
               <div class="flex border-b border-gray-200 bg-white">
                 <button type="button" class="px-6 py-4 font-bold">Aa</button>
@@ -732,11 +732,11 @@ onMounted(loadMembersAreaData)
           </div>
         </div>
 
-        <div class="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <div class="mt-12 grid grid-cols-1 lg:grid-cols-[minmax(300px,0.9fr)_minmax(620px,2fr)] gap-10">
           <div>
             <h3 class="text-lg font-medium leading-6 text-gray-900">Arquivos</h3>
           </div>
-          <div class="lg:col-span-2 bg-white rounded-lg p-6">
+          <div class="bg-white rounded-lg p-6 min-w-0">
             <label for="lesson-attachments-upload" class="flex items-center justify-center min-h-44 border-2 border-dashed border-gray-400 rounded-md cursor-pointer text-center p-8 hover:bg-gray-50" @dragover.prevent @drop="handleAttachmentUpload">
               <div>
                 <div class="text-xl text-gray-700">Drop here or <span class="text-blue-500">selecione do computador</span></div>
@@ -753,12 +753,12 @@ onMounted(loadMembersAreaData)
           </div>
         </div>
 
-        <div class="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <div class="mt-12 grid grid-cols-1 lg:grid-cols-[minmax(300px,0.9fr)_minmax(620px,2fr)] gap-10">
           <div>
             <h3 class="text-lg font-medium leading-6 text-gray-900">Liberação</h3>
             <p class="mt-3 text-sm leading-5 text-gray-500">Aprenda mais sobre as configurações de <a href="#" class="text-indigo-500 underline">liberação do conteúdo</a></p>
           </div>
-          <div class="lg:col-span-2 bg-white rounded-lg p-6 space-y-8">
+          <div class="bg-white rounded-lg p-6 space-y-8 min-w-0">
             <div>
               <h4 class="text-sm font-medium text-gray-700 mb-4">Quando liberar o conteúdo</h4>
               <label class="flex items-center gap-3 mb-4"><input v-model="lessonForm.releaseType" value="immediate" type="radio" class="form-radio text-indigo-600">Liberação imediata</label>
