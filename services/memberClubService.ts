@@ -10,6 +10,7 @@ const figurinhasAreaIds = new Set([
 
 const isFigurinhasArea = (id = '', title = '') => figurinhasAreaIds.has(id) || /figurinhas|copa 2026/i.test(title)
 const blockedMemberContentPattern = /robo|rob[oô]|lightroom|presets|ribas/i
+const figurinhasDriveLink = 'https://drive.google.com/drive/folders/1owxb2iB_VVps8W05OqwI8aNjt61ObjjP'
 const isCleanMemberAreaUpload = (value = '') => /member-area-covers.*clean-/i.test(value)
 const cleanMemberClubImage = (value = '', fallback = '') => {
   if (/^(data:image|blob:)/i.test(value)) return value
@@ -19,6 +20,14 @@ const cleanMemberClubImage = (value = '', fallback = '') => {
   return fallback
 }
 const cleanMemberClubText = (value = '', fallback = 'Figurinhas da Copa 2026') => blockedMemberContentPattern.test(value) ? fallback : value
+const cleanMemberClubLessonText = (value = '') => {
+  if (!value || value.includes('https://drive.google.com/drive...')) return `Baixe todos os arquivos neste link\n${figurinhasDriveLink}`
+  return value.replace(/https:\/\/drive\.google\.com\/drive\.\.\./g, figurinhasDriveLink)
+}
+const resolveMemberClubModuleImage = (row: Record<string, any>, title = '') => {
+  if (/baixar figurinhas|figurinhas/i.test(title)) return defaultFigurinhasModuleImage
+  return cleanMemberClubImage(row.cover_url || row.image_url || defaultFigurinhasModuleImage, defaultFigurinhasModuleImage) || defaultFigurinhasModuleImage
+}
 
 const readLocalCustomization = (id: string) => {
   if (!process.client) return {}
@@ -96,7 +105,7 @@ const normalizeLesson = (row: Record<string, any>, moduleId: string, index: numb
   id: row.id || `${moduleId}-lesson-${index}`,
   moduleId,
   title: row.title || `Aula ${index + 1}`,
-  description: row.description || row.content || '',
+  description: cleanMemberClubLessonText(row.description || row.content || ''),
   videoUrl: row.video_url || '',
   duration: row.duration || '',
   position: Number(row.position ?? index + 1),
@@ -121,7 +130,7 @@ const normalizeModule = (
     id,
     title: cleanMemberClubText(row.title || `Módulo ${index + 1}`, `Módulo ${index + 1}`),
     description: row.description || '',
-    imageUrl: cleanMemberClubImage(row.cover_url || row.image_url || courseCoverUrl || defaultFigurinhasModuleImage),
+    imageUrl: resolveMemberClubModuleImage(row, row.title || ''),
     position: Number(row.position ?? index + 1),
     status: String(row.status || 'Publicado').toLowerCase().includes('bloque')
       ? 'locked'

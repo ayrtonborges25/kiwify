@@ -100,7 +100,7 @@ export type MemberClubData = {
 }
 
 export const defaultClubBanner = ''
-export const defaultFigurinhasModuleImage = ''
+export const defaultFigurinhasModuleImage = '/figurinhas-module-thumb.jpg'
 
 const mockModules: MemberClubModule[] = [
   {
@@ -114,7 +114,7 @@ const mockModules: MemberClubModule[] = [
         id: 'welcome-lesson',
         moduleId: 'welcome',
         title: 'BAIXE SEUS ARQUIVOS AQUI',
-        description: 'Baixe todos os arquivos neste link\nhttps://drive.google.com/drive...',
+        description: 'Baixe todos os arquivos neste link\nhttps://drive.google.com/drive/folders/1owxb2iB_VVps8W05OqwI8aNjt61ObjjP',
         duration: '',
         position: 1,
         status: 'available'

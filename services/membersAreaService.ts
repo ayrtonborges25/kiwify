@@ -33,6 +33,8 @@ const defaultSettings: MembersAreaSettings = {
   commentsEnabled: false
 }
 const defaultClubBanner = ''
+const defaultFigurinhasModuleImage = '/figurinhas-module-thumb.jpg'
+const figurinhasDriveLink = 'https://drive.google.com/drive/folders/1owxb2iB_VVps8W05OqwI8aNjt61ObjjP'
 const defaultCustomization: MembersAreaCustomization = {
   theme: {
     primaryColor: '#4f46e5',
@@ -86,11 +88,19 @@ const blockedMemberContentPattern = /robo|rob[oô]|lightroom|presets|ribas/i
 const isCleanMemberAreaUpload = (value = '') => /member-area-covers.*clean-/i.test(value)
 const cleanMembersAreaImage = (value = '') => {
   if (/^(data:image|blob:)/i.test(value) || isCleanMemberAreaUpload(value)) return value
-  if (value === defaultClubBanner) return value
+  if (value === defaultClubBanner || value === defaultFigurinhasModuleImage) return value
   if (!value || blockedMemberContentPattern.test(value)) return ''
   return ''
 }
 const cleanMembersAreaText = (value = '', fallback = 'Figurinhas da Copa 2026') => blockedMemberContentPattern.test(value) ? fallback : value
+const cleanMembersAreaLessonText = (value = '') => {
+  if (!value || value.includes('https://drive.google.com/drive...')) return `Baixe todos os arquivos neste link\n${figurinhasDriveLink}`
+  return value.replace(/https:\/\/drive\.google\.com\/drive\.\.\./g, figurinhasDriveLink)
+}
+const resolveMembersAreaModuleImage = (row: Record<string, any>, title = '') => {
+  if (/baixar figurinhas|figurinhas/i.test(title)) return defaultFigurinhasModuleImage
+  return cleanMembersAreaImage(row.image_url || defaultFigurinhasModuleImage) || defaultFigurinhasModuleImage
+}
 
 const normalizeCustomization = (customization: MembersAreaCustomization = {}, areaName = 'Figurinhas da Copa 2026', coverUrl = ''): MembersAreaCustomization => {
   const safeAreaName = cleanMembersAreaText(areaName)
@@ -204,7 +214,7 @@ const defaultLesson = (moduleId: string, courseId?: string): MembersAreaLesson =
   moduleId,
   title: 'BAIXE SEUS ARQUIVOS AQUI',
   description: '',
-  content: 'Baixe todos os arquivos neste link\nhttps://drive.google.com/drive...',
+  content: `Baixe todos os arquivos neste link\n${figurinhasDriveLink}`,
   videoUrl: '',
   thumbnailUrl: '',
   attachments: [],
@@ -222,7 +232,7 @@ const defaultCourseModules = (courseId: string): MembersAreaModule[] => [{
   title: 'Baixar figurinhas',
   lessons: 1,
   status: 'Publicado',
-  imageUrl: '',
+  imageUrl: defaultFigurinhasModuleImage,
   position: 1,
   contents: [defaultLesson('welcome', courseId)]
 }]
@@ -273,7 +283,7 @@ const mapLessonFromSupabase = (row: Record<string, any>, moduleId: string, index
   moduleId,
   title: row.title || 'Novo conteúdo',
   description: row.description || '',
-  content: row.content || '',
+  content: cleanMembersAreaLessonText(row.content || row.description || ''),
   videoUrl: row.video_url || '',
   thumbnailUrl: row.thumbnail_url || '',
   attachments: Array.isArray(row.attachments) ? row.attachments : [],
@@ -291,7 +301,7 @@ const mapModuleFromSupabase = (row: Record<string, any>): MembersAreaModule => (
   title: cleanMembersAreaText(row.title || 'Modulo', 'Modulo'),
   lessons: row.lessons?.length || 0,
   status: row.status || 'Publicado',
-  imageUrl: row.image_url || '',
+  imageUrl: resolveMembersAreaModuleImage(row, row.title || ''),
   position: Number(row.position || 0),
   contents: (row.lessons || []).map((lesson: Record<string, any>, index: number) => mapLessonFromSupabase(lesson, row.id, index))
 })

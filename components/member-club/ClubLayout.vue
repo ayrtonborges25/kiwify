@@ -47,11 +47,10 @@ const heroImage = computed(() => safeClubImage(banner.value.imageUrl || slides.v
 
 const activeModule = ref<MemberClubModule>()
 const activeLesson = ref<MemberClubLesson>()
-const moduleLesson = computed(() => activeModule.value?.lessons[0])
 const openModule = (module: MemberClubModule) => {
   if (isEditorPreview.value) return
   activeModule.value = module
-  activeLesson.value = undefined
+  activeLesson.value = module.lessons[0]
 }
 const closeModule = () => {
   activeModule.value = undefined
@@ -64,7 +63,7 @@ const openLesson = (lesson?: MemberClubLesson) => {
 const lessonDescriptionParts = computed(() => {
   const description = activeLesson.value?.description || ''
   const [text, link] = description.split('\n')
-  return { text: text || 'Baixe todos os arquivos neste link', link: link || 'https://drive.google.com/drive...' }
+  return { text: text || 'Baixe todos os arquivos neste link', link: link || 'https://drive.google.com/drive/folders/1owxb2iB_VVps8W05OqwI8aNjt61ObjjP' }
 })
 </script>
 
@@ -214,39 +213,6 @@ const lessonDescriptionParts = computed(() => {
       </template>
     </section>
 
-    <div v-if="activeModule && !activeLesson" class="club-module-modal-backdrop">
-      <div class="club-module-modal" role="dialog" aria-modal="true">
-        <button type="button" class="club-module-modal__close" aria-label="Fechar" @click="closeModule">×</button>
-        <div class="club-module-modal__hero">
-          <p>{{ activeModule.title }}</p>
-          <h2>{{ moduleLesson?.title || activeModule.title }}</h2>
-          <span class="club-module-modal__progress" />
-          <button type="button" class="club-module-modal__resume" @click="openLesson(moduleLesson)">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z" /></svg>
-            Retomar
-          </button>
-        </div>
-        <div class="club-module-modal__body">
-          <h3>{{ data?.course.title || data?.club.title }}</h3>
-          <p>{{ modules.length }} módulo{{ modules.length === 1 ? '' : 's' }} <span>•</span> {{ activeModule.lessons.length }} aula{{ activeModule.lessons.length === 1 ? '' : 's' }}</p>
-          <button type="button" class="club-module-modal__select">{{ activeModule.title }} <span>⌄</span></button>
-          <button
-            v-for="lesson in activeModule.lessons"
-            :key="lesson.id"
-            type="button"
-            class="club-module-modal__lesson"
-            @click="openLesson(lesson)"
-          >
-            <span class="club-module-modal__check">✓</span>
-            <span class="club-module-modal__thumb">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm-1 1.5L18.5 9H13zM8 13h8v2H8zm0 4h8v2H8z" /></svg>
-            </span>
-            <strong>{{ lesson.title }}</strong>
-          </button>
-        </div>
-      </div>
-    </div>
-
     <aside class="fixed bottom-0 inset-x-0 z-20 md:hidden bg-primary-500" id="club__bottom_nav">
       <nav class="py-2 px-2 flex flex-row items-center justify-around gap-2">
         <a href="#" class="router-link-active router-link-exact-active flex flex-col items-center justify-center text-center font-medium rounded-md border focus:outline-none transition ease-in-out duration-150 text-primary-foreground border-transparent leading-3 text-xs p-0 gap-0 cursor-pointer w-11 h-9" title="Home">Home</a>
@@ -333,151 +299,6 @@ const lessonDescriptionParts = computed(() => {
   color: #fff;
 }
 
-.club-module-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 56px;
-  background: rgba(0, 0, 0, .62);
-  backdrop-filter: blur(5px);
-}
-
-.club-module-modal {
-  position: relative;
-  width: 970px;
-  max-width: calc(100vw - 48px);
-  min-height: 640px;
-  overflow: hidden;
-  border-radius: 12px;
-  color: #fff;
-  background: #19191d;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, .45);
-}
-
-.club-module-modal__close {
-  position: absolute;
-  top: 22px;
-  right: 22px;
-  z-index: 2;
-  width: 48px;
-  height: 48px;
-  border: 0;
-  border-radius: 999px;
-  color: #d1d5db;
-  background: rgba(0, 0, 0, .28);
-  font-size: 44px;
-  line-height: 40px;
-  cursor: pointer;
-}
-
-.club-module-modal__hero {
-  min-height: 545px;
-  padding: 320px 66px 40px;
-  background: linear-gradient(180deg, #44454d 0%, #3a3b43 58%, #33343b 100%);
-}
-
-.club-module-modal__hero p {
-  margin: 0 0 18px;
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.club-module-modal__hero h2 {
-  margin: 0 0 24px;
-  font-size: 30px;
-  line-height: 1.15;
-  font-weight: 800;
-}
-
-.club-module-modal__progress {
-  display: block;
-  width: 420px;
-  max-width: 100%;
-  height: 5px;
-  margin: 0 0 30px;
-  border-radius: 999px;
-  background: #ef4444;
-}
-
-.club-module-modal__resume {
-  min-width: 238px;
-  min-height: 68px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
-  border: 0;
-  border-radius: 6px;
-  color: #111827;
-  background: #fff;
-  font-size: 29px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.club-module-modal__resume svg {
-  width: 34px;
-  height: 34px;
-}
-
-.club-module-modal__body {
-  padding: 28px 66px 40px;
-  background: #19191d;
-}
-
-.club-module-modal__body h3 {
-  margin: 0 0 14px;
-  font-size: 36px;
-  line-height: 1.1;
-}
-
-.club-module-modal__body p {
-  margin: 0 0 24px;
-  color: #b7b7bd;
-  font-size: 18px;
-}
-
-.club-module-modal__body p span {
-  margin: 0 8px;
-}
-
-.club-module-modal__select {
-  width: 504px;
-  max-width: 100%;
-  height: 60px;
-  margin-bottom: 16px;
-  padding: 0 18px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border: 1px solid rgba(255, 255, 255, .24);
-  border-radius: 6px;
-  color: #fff;
-  background: transparent;
-  font-size: 18px;
-  text-align: left;
-}
-
-.club-module-modal__lesson {
-  width: 100%;
-  min-height: 158px;
-  display: grid;
-  grid-template-columns: 34px 202px 1fr;
-  align-items: center;
-  gap: 24px;
-  border: 0;
-  border-radius: 8px;
-  color: #fff;
-  background: #2b2c31;
-  text-align: left;
-  cursor: pointer;
-  padding: 20px;
-}
-
-.club-module-modal__check,
 .club-lesson-view__check {
   width: 28px;
   height: 28px;
@@ -490,7 +311,6 @@ const lessonDescriptionParts = computed(() => {
   font-weight: 800;
 }
 
-.club-module-modal__thumb,
 .club-lesson-view__thumb {
   height: 108px;
   border-radius: 7px;
@@ -502,16 +322,9 @@ const lessonDescriptionParts = computed(() => {
   background: #facc15;
 }
 
-.club-module-modal__thumb svg,
 .club-lesson-view__thumb svg {
   width: 52px;
   height: 52px;
-}
-
-.club-module-modal__lesson strong {
-  font-size: 24px;
-  line-height: 1.2;
-  font-weight: 500;
 }
 
 .club-lesson-view {
