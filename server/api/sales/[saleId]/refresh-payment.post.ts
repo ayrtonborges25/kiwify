@@ -2,6 +2,7 @@ import { sendProductAccessEmail } from '~/server/utils/deliveryEmail'
 import { ensureProductDelivery } from '~/server/utils/productDelivery'
 import { getSupabaseServerClient } from '~/server/utils/supabaseServer'
 import { resolveApprovedRedirect } from '~/server/utils/approvedRedirect'
+import { normalizeAsaasPixQrCode, resolveAsaasRuntime } from '~/server/utils/asaas'
 
 const normalizeStatus = (status?: string) => {
   if (status === 'RECEIVED' || status === 'CONFIRMED') return 'approved'
@@ -78,16 +79,7 @@ const mapDelivery = (row: Record<string, any> | null | undefined) => {
 }
 
 const asaasFetch = async <T>(path: string) => {
-  const config = useRuntimeConfig()
-  const apiKey = String(config.asaasApiKey || '')
-  const baseUrl = String(config.asaasBaseUrl || 'https://api.asaas.com/v3').replace(/\/$/, '')
-
-  if (!apiKey) {
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'ASAAS_API_KEY nao configurada no servidor.'
-    })
-  }
+  const { apiKey, baseUrl } = resolveAsaasRuntime()
 
   return $fetch<T>(`${baseUrl}${path}`, {
     headers: {
@@ -148,8 +140,9 @@ export default defineEventHandler(async (event) => {
   if (String(payment.billingType) === 'PIX' && status !== 'approved') {
     try {
       const pix = await asaasFetch<Record<string, any>>(`/payments/${sale.provider_payment_id}/pixQrCode`)
-      pixQrCode = pix.encodedImage || pix.qrCode || pix.payload || pixQrCode
-      pixCopyPaste = pix.payload || pixCopyPaste
+      const normalizedPix = normalizeAsaasPixQrCode(pix)
+      pixQrCode = normalizedPix.pixQrCode || pixQrCode
+      pixCopyPaste = normalizedPix.pixCopyPaste || pixCopyPaste
     } catch {
       // Mantem os dados Pix ja salvos.
     }

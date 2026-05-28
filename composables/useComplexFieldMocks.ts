@@ -382,7 +382,7 @@ export function useComplexFieldMocks() {
       return
     }
 
-    if (text.includes('Upload de vídeos') || text.includes('Upload em massa')) {
+    if ((text.includes('Upload de vídeos') || text.includes('Upload em massa')) && !target.closest('[data-disable-mock-upload]')) {
       openVideoPicker(text.includes('massa'))
       return
     }

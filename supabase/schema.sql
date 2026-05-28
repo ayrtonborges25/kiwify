@@ -326,6 +326,7 @@ alter table public.courses drop constraint if exists courses_status_check;
 
 alter table public.modules add column if not exists course_id uuid references public.courses(id) on delete cascade;
 alter table public.modules add column if not exists title text;
+alter table public.modules add column if not exists image_url text;
 alter table public.modules add column if not exists position integer default 0;
 alter table public.modules add column if not exists status text default 'Publicado';
 alter table public.modules add column if not exists created_at timestamptz not null default now();
@@ -334,7 +335,15 @@ alter table public.modules add column if not exists updated_at timestamptz not n
 alter table public.lessons add column if not exists course_id uuid references public.courses(id) on delete cascade;
 alter table public.lessons add column if not exists module_id uuid references public.modules(id) on delete set null;
 alter table public.lessons add column if not exists title text;
+alter table public.lessons add column if not exists description text;
+alter table public.lessons add column if not exists content text;
 alter table public.lessons add column if not exists video_url text;
+alter table public.lessons add column if not exists thumbnail_url text;
+alter table public.lessons add column if not exists attachments jsonb not null default '[]'::jsonb;
+alter table public.lessons add column if not exists release_type text default 'immediate';
+alter table public.lessons add column if not exists release_days integer default 0;
+alter table public.lessons add column if not exists release_date date;
+alter table public.lessons add column if not exists duration_limited boolean not null default false;
 alter table public.lessons add column if not exists position integer;
 alter table public.lessons add column if not exists status text default 'Publicado';
 alter table public.lessons add column if not exists created_at timestamptz not null default now();

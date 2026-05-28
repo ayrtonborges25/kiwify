@@ -5,6 +5,8 @@ import {
   type MembersAreaCourse,
   type MembersAreaCustomization,
   type MembersAreaGroup,
+  type MembersAreaLesson,
+  type MembersAreaLessonAttachment,
   type MembersAreaModule,
   type MembersAreaSettings,
   type MembersAreaStudent
@@ -17,6 +19,11 @@ export type CreateMembersAreaModulePayload = Partial<MembersAreaModule> & {
   membersAreaId?: string
   courseId?: string
   description?: string
+}
+export type MembersAreaLessonPayload = Partial<Omit<MembersAreaLesson, 'id'>> & {
+  id?: string
+  courseId?: string
+  moduleId: string
 }
 
 const membersAreasStore: MembersArea[] = [...mockMembersAreas]
@@ -163,6 +170,7 @@ const normalizeCustomization = (customization: MembersAreaCustomization = {}, ar
 }
 
 const localStoreKey = (id: string, key: 'settings' | 'customization' | 'groups') => `members-area:${id}:${key}`
+const localCourseModulesKey = (courseId: string) => `members-area-course:${courseId}:modules`
 
 const readLocalValue = <T>(id: string, key: 'settings' | 'customization' | 'groups', fallback: T): T => {
   if (!process.client) return fallback
@@ -190,6 +198,52 @@ const createMockId = () => {
   return `mock-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
+const defaultLesson = (moduleId: string, courseId?: string): MembersAreaLesson => ({
+  id: 'welcome-lesson',
+  courseId,
+  moduleId,
+  title: 'BAIXE SEUS ARQUIVOS AQUI',
+  description: '',
+  content: 'Baixe todos os arquivos neste link\nhttps://drive.google.com/drive...',
+  videoUrl: '',
+  thumbnailUrl: '',
+  attachments: [],
+  releaseType: 'immediate',
+  releaseDays: 0,
+  releaseDate: '',
+  durationLimited: false,
+  position: 1,
+  status: 'Publicado'
+})
+
+const defaultCourseModules = (courseId: string): MembersAreaModule[] => [{
+  id: 'welcome',
+  courseId,
+  title: 'Baixar figurinhas',
+  lessons: 1,
+  status: 'Publicado',
+  imageUrl: '',
+  position: 1,
+  contents: [defaultLesson('welcome', courseId)]
+}]
+
+const readCourseModulesLocal = (courseId: string): MembersAreaModule[] => {
+  if (!process.client) return defaultCourseModules(courseId)
+  try {
+    const raw = localStorage.getItem(localCourseModulesKey(courseId))
+    if (!raw) return defaultCourseModules(courseId)
+    const modules = JSON.parse(raw)
+    return Array.isArray(modules) && modules.length ? modules : defaultCourseModules(courseId)
+  } catch {
+    return defaultCourseModules(courseId)
+  }
+}
+
+const writeCourseModulesLocal = (courseId: string, modules: MembersAreaModule[]) => {
+  if (!process.client) return
+  localStorage.setItem(localCourseModulesKey(courseId), JSON.stringify(modules))
+}
+
 const mapMembersAreaFromSupabase = (row: Record<string, any>): MembersArea => ({
   id: row.id,
   name: cleanMembersAreaText(row.courses?.[0]?.title || row.title || 'Área de membros'),
@@ -213,10 +267,33 @@ const mapCourseFromSupabase = (row: Record<string, any>): MembersAreaCourse => (
   coverUrl: cleanMembersAreaImage(row.cover_url || '')
 })
 
+const mapLessonFromSupabase = (row: Record<string, any>, moduleId: string, index: number): MembersAreaLesson => ({
+  id: row.id || createMockId(),
+  courseId: row.course_id || undefined,
+  moduleId,
+  title: row.title || 'Novo conteúdo',
+  description: row.description || '',
+  content: row.content || '',
+  videoUrl: row.video_url || '',
+  thumbnailUrl: row.thumbnail_url || '',
+  attachments: Array.isArray(row.attachments) ? row.attachments : [],
+  releaseType: row.release_type || 'immediate',
+  releaseDays: Number(row.release_days || 0),
+  releaseDate: row.release_date || '',
+  durationLimited: Boolean(row.duration_limited),
+  position: Number(row.position || index + 1),
+  status: row.status || 'Publicado'
+})
+
 const mapModuleFromSupabase = (row: Record<string, any>): MembersAreaModule => ({
+  id: row.id,
+  courseId: row.course_id,
   title: cleanMembersAreaText(row.title || 'Modulo', 'Modulo'),
   lessons: row.lessons?.length || 0,
-  status: row.status || 'Publicado'
+  status: row.status || 'Publicado',
+  imageUrl: row.image_url || '',
+  position: Number(row.position || 0),
+  contents: (row.lessons || []).map((lesson: Record<string, any>, index: number) => mapLessonFromSupabase(lesson, row.id, index))
 })
 
 const fallbackAreas = () => membersAreasStore
@@ -252,7 +329,7 @@ export const listMembersAreaModules = async (courseId?: string) => {
 
     let query = supabase
       .from('modules')
-      .select('*, lessons(id)')
+      .select('*, lessons(id,course_id,module_id,title,description,content,video_url,thumbnail_url,attachments,release_type,release_days,release_date,duration_limited,position,status)')
       .order('position', { ascending: true })
 
     if (courseId) query = query.eq('course_id', courseId)
@@ -264,6 +341,33 @@ export const listMembersAreaModules = async (courseId?: string) => {
     return data.map(mapModuleFromSupabase)
   } catch {
     return fallbackModules()
+  }
+}
+
+export const listCourseModules = async (courseId: string): Promise<MembersAreaModule[]> => {
+  const fallback = readCourseModulesLocal(courseId)
+
+  try {
+    const supabase = getSupabaseClient()
+    if (!supabase || !courseId) return fallback
+
+    const { data, error } = await supabase
+      .from('modules')
+      .select('*, lessons(id,course_id,module_id,title,description,content,video_url,thumbnail_url,attachments,release_type,release_days,release_date,duration_limited,position,status)')
+      .eq('course_id', courseId)
+      .order('position', { ascending: true })
+
+    if (error || !data?.length) return fallback
+
+    const modules = data.map(mapModuleFromSupabase).map((module, index) => ({
+      ...module,
+      position: Number(module.position || index + 1),
+      contents: module.contents?.length ? module.contents : []
+    }))
+    writeCourseModulesLocal(courseId, modules)
+    return modules
+  } catch {
+    return fallback
   }
 }
 
@@ -615,6 +719,202 @@ export const deleteCourseAndMaybeMembersArea = async (payload: { courseId?: stri
   const index = membersAreasStore.findIndex((item) => item.id === membersAreaId)
   if (index >= 0) membersAreasStore.splice(index, 1)
   return true
+}
+
+export const saveCourseModules = async (courseId: string, modules: MembersAreaModule[]) => {
+  const normalized = modules.map((module, moduleIndex) => ({
+    ...module,
+    id: module.id || createMockId(),
+    courseId,
+    position: module.position || moduleIndex + 1,
+    lessons: module.contents?.length || module.lessons || 0,
+    contents: (module.contents || []).map((lesson, lessonIndex) => ({
+      ...lesson,
+      id: lesson.id || createMockId(),
+      courseId,
+      moduleId: module.id || lesson.moduleId || '',
+      position: lesson.position || lessonIndex + 1,
+      releaseType: lesson.releaseType || 'immediate',
+      attachments: lesson.attachments || []
+    }))
+  }))
+
+  writeCourseModulesLocal(courseId, normalized)
+  return normalized
+}
+
+export const createModule = async (courseId: string, payload: Partial<MembersAreaModule> = {}) => {
+  const existing = await listCourseModules(courseId)
+  const module: MembersAreaModule = {
+    id: createMockId(),
+    courseId,
+    title: payload.title || 'Novo módulo',
+    lessons: 0,
+    status: payload.status || 'Publicado',
+    imageUrl: payload.imageUrl || '',
+    position: existing.length + 1,
+    contents: []
+  }
+
+  try {
+    const supabase = getSupabaseClient()
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('modules')
+        .insert({
+          course_id: courseId,
+          title: module.title,
+          image_url: module.imageUrl,
+          status: module.status,
+          position: module.position
+        })
+        .select('id,course_id,title,position,status')
+        .single()
+
+      if (!error && data) {
+        module.id = data.id
+        module.courseId = data.course_id
+        module.position = data.position
+        module.status = data.status
+      }
+    }
+  } catch {
+    // Mantem persistencia local.
+  }
+
+  const next = await saveCourseModules(courseId, [...existing, module])
+  return next.find((item) => item.id === module.id) || module
+}
+
+export const updateModule = async (courseId: string, moduleId: string, payload: Partial<MembersAreaModule> = {}) => {
+  const existing = await listCourseModules(courseId)
+  const next = existing.map((module) => module.id === moduleId
+    ? { ...module, ...payload, id: module.id, courseId, lessons: payload.contents?.length ?? module.contents?.length ?? module.lessons }
+    : module)
+
+  try {
+    const supabase = getSupabaseClient()
+    if (supabase) {
+      await supabase
+        .from('modules')
+        .update({
+          title: payload.title,
+          image_url: payload.imageUrl,
+          status: payload.status,
+          position: payload.position
+        })
+        .eq('id', moduleId)
+    }
+  } catch {
+    // Mantem persistencia local.
+  }
+
+  await saveCourseModules(courseId, next)
+  return next.find((module) => module.id === moduleId)
+}
+
+export const deleteModule = async (courseId: string, moduleId: string) => {
+  const existing = await listCourseModules(courseId)
+  const next = existing.filter((module) => module.id !== moduleId).map((module, index) => ({ ...module, position: index + 1 }))
+
+  try {
+    const supabase = getSupabaseClient()
+    if (supabase) await supabase.from('modules').delete().eq('id', moduleId)
+  } catch {
+    // Mantem persistencia local.
+  }
+
+  await saveCourseModules(courseId, next)
+  return next
+}
+
+export const saveLesson = async (courseId: string, payload: MembersAreaLessonPayload) => {
+  const modules = await listCourseModules(courseId)
+  const module = modules.find((item) => item.id === payload.moduleId)
+  if (!module) return undefined
+
+  const existingLessons = module.contents || []
+  const isNew = !payload.id || !existingLessons.some((lesson) => lesson.id === payload.id)
+  const lesson: MembersAreaLesson = {
+    id: payload.id || createMockId(),
+    courseId,
+    moduleId: payload.moduleId,
+    title: payload.title || 'Novo conteúdo',
+    description: payload.description || '',
+    content: payload.content || '',
+    videoUrl: payload.videoUrl || '',
+    thumbnailUrl: payload.thumbnailUrl || '',
+    attachments: payload.attachments || [],
+    releaseType: payload.releaseType || 'immediate',
+    releaseDays: Number(payload.releaseDays || 0),
+    releaseDate: payload.releaseDate || '',
+    durationLimited: Boolean(payload.durationLimited),
+    position: payload.position || existingLessons.length + 1,
+    status: payload.status || 'Publicado'
+  }
+
+  try {
+    const supabase = getSupabaseClient()
+    if (supabase) {
+      const dbPayload = {
+        id: lesson.id,
+        course_id: courseId,
+        module_id: lesson.moduleId,
+        title: lesson.title,
+        description: lesson.description,
+        content: lesson.content,
+        video_url: lesson.videoUrl,
+        thumbnail_url: lesson.thumbnailUrl,
+        attachments: lesson.attachments,
+        release_type: lesson.releaseType,
+        release_days: lesson.releaseDays,
+        release_date: lesson.releaseDate || null,
+        duration_limited: lesson.durationLimited,
+        position: lesson.position,
+        status: lesson.status
+      }
+      const { data, error } = await supabase
+        .from('lessons')
+        .upsert(dbPayload, { onConflict: 'id' })
+        .select('id')
+        .single()
+      if (!error && data?.id) lesson.id = data.id
+    }
+  } catch {
+    // Mantem persistencia local.
+  }
+
+  const next = modules.map((item) => {
+    if (item.id !== payload.moduleId) return item
+    const contents = isNew
+      ? [...existingLessons, lesson]
+      : existingLessons.map((current) => current.id === lesson.id ? lesson : current)
+    return { ...item, contents, lessons: contents.length }
+  })
+
+  await saveCourseModules(courseId, next)
+  return lesson
+}
+
+export const deleteLesson = async (courseId: string, moduleId: string, lessonId: string) => {
+  const modules = await listCourseModules(courseId)
+  const next = modules.map((module) => {
+    if (module.id !== moduleId) return module
+    const contents = (module.contents || [])
+      .filter((lesson) => lesson.id !== lessonId)
+      .map((lesson, index) => ({ ...lesson, position: index + 1 }))
+    return { ...module, contents, lessons: contents.length }
+  })
+
+  try {
+    const supabase = getSupabaseClient()
+    if (supabase) await supabase.from('lessons').delete().eq('id', lessonId)
+  } catch {
+    // Mantem persistencia local.
+  }
+
+  await saveCourseModules(courseId, next)
+  return next
 }
 
 export const createCourse = async (payload: CreateMembersAreaModulePayload = {}) => {

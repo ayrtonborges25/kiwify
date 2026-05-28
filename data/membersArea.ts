@@ -33,6 +33,32 @@ export interface MembersAreaGroup {
   isDefault?: boolean
 }
 
+export interface MembersAreaLessonAttachment {
+  id: string
+  name: string
+  url: string
+  size?: number
+  type?: string
+}
+
+export interface MembersAreaLesson {
+  id: string
+  courseId?: string
+  moduleId: string
+  title: string
+  description?: string
+  content?: string
+  videoUrl?: string
+  thumbnailUrl?: string
+  attachments?: MembersAreaLessonAttachment[]
+  releaseType?: 'immediate' | 'days' | 'date'
+  releaseDays?: number
+  releaseDate?: string
+  durationLimited?: boolean
+  position: number
+  status: string
+}
+
 export interface MembersAreaSettings {
   type: 'lite' | 'complete'
   commentsEnabled: boolean
@@ -97,9 +123,14 @@ export interface MembersAreaCustomization {
 }
 
 export interface MembersAreaModule {
+  id?: string
+  courseId?: string
   title: string
   lessons: number
   status: string
+  imageUrl?: string
+  position?: number
+  contents?: MembersAreaLesson[]
 }
 
 export const membersAreas: MembersArea[] = [

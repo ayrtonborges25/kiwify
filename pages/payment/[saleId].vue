@@ -35,6 +35,12 @@ const description = computed(() => {
   if (isBoleto.value) return 'Abra o boleto para concluir o pagamento. O status fica pendente ate a compensacao.'
   return 'Finalize o pagamento para liberar o acesso.'
 })
+const pixQrImageSrc = computed(() => {
+  const qrCode = String(sale.value?.pixQrCode || '')
+  if (!qrCode || qrCode.startsWith('000201')) return ''
+  if (qrCode.startsWith('data:image')) return qrCode
+  return `data:image/png;base64,${qrCode}`
+})
 
 const accessUrl = computed(() => {
   if (approvedAccessUrl.value) return approvedAccessUrl.value
@@ -113,7 +119,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-if="sale?.pixQrCode || sale?.pixCopyPaste" class="payment-result">
-        <img v-if="sale.pixQrCode" :src="`data:image/png;base64,${sale.pixQrCode}`" alt="QR Code Pix">
+        <img v-if="pixQrImageSrc" :src="pixQrImageSrc" alt="QR Code Pix">
         <textarea v-if="sale.pixCopyPaste" readonly :value="sale.pixCopyPaste" />
       </div>
 

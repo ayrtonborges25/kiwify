@@ -1,18 +1,24 @@
 import {
   createCourse as serviceCreateCourse,
+  createModule as serviceCreateModule,
   createMembersArea as serviceCreateMembersArea,
+  deleteLesson as serviceDeleteLesson,
   deleteMembersArea as serviceDeleteMembersArea,
+  deleteModule as serviceDeleteModule,
   getMembersAreaModulesSnapshot,
   getMembersAreasSnapshot,
   importCourse as serviceImportCourse,
+  listCourseModules,
   listMembersAreaCourses,
   listMembersAreaGroups,
   listMembersAreaModules,
   listMembersAreaStudents,
   listMembersAreas,
+  saveLesson as serviceSaveLesson,
   saveMembersAreaCustomization as serviceSaveMembersAreaCustomization,
   saveMembersAreaGroups as serviceSaveMembersAreaGroups,
   saveMembersAreaSettings as serviceSaveMembersAreaSettings,
+  updateModule as serviceUpdateModule,
   updateMembersArea as serviceUpdateMembersArea
 } from '~/services/membersAreaService'
 
@@ -76,6 +82,12 @@ export function useMembersArea() {
     return course
   }
 
+  const createModule = async (...args: Parameters<typeof serviceCreateModule>) => serviceCreateModule(...args)
+  const updateModule = async (...args: Parameters<typeof serviceUpdateModule>) => serviceUpdateModule(...args)
+  const deleteModule = async (...args: Parameters<typeof serviceDeleteModule>) => serviceDeleteModule(...args)
+  const saveLesson = async (...args: Parameters<typeof serviceSaveLesson>) => serviceSaveLesson(...args)
+  const deleteLesson = async (...args: Parameters<typeof serviceDeleteLesson>) => serviceDeleteLesson(...args)
+
   void refreshMembersAreas()
   void refreshModules()
 
@@ -86,6 +98,7 @@ export function useMembersArea() {
     refreshModules,
     getMembersAreaById,
     listMembersAreaCourses,
+    listCourseModules,
     listMembersAreaStudents,
     listMembersAreaGroups,
     createMembersArea,
@@ -93,6 +106,11 @@ export function useMembersArea() {
     saveMembersAreaSettings,
     saveMembersAreaCustomization,
     saveMembersAreaGroups,
+    createModule,
+    updateModule,
+    deleteModule,
+    saveLesson,
+    deleteLesson,
     deleteMembersArea,
     createCourse,
     importCourse
