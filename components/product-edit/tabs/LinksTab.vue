@@ -22,6 +22,7 @@ const offerDraft = reactive({
 
 const checkoutLinks = computed(() => {
   const firstOfferUrl = offers.value[0]?.publicUrl || `/checkout/${productId.value}-default-offer`
+  const defaultCheckoutName = product.value?.name || 'Oferta principal'
 
   return [
     {
@@ -33,14 +34,14 @@ const checkoutLinks = computed(() => {
       status: 'Desativado' as const
     },
     ...offers.value.map((offer) => ({
-    id: offer.id,
-    name: offer.label || offer.name,
-    url: offer.publicUrl,
-    type: 'Checkout' as const,
-    price: offer.price,
-    status: offer.status,
-    offer
-  }))
+      id: offer.id,
+      name: offer.isDefault ? defaultCheckoutName : (offer.label || offer.name),
+      url: offer.publicUrl,
+      type: 'Checkout' as const,
+      price: offer.price,
+      status: offer.status,
+      offer
+    }))
   ]
 })
 

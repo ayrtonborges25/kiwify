@@ -102,7 +102,7 @@ const loadCheckout = async () => {
         isDefault: true,
         status: product.value?.status === 'Deletado' ? 'Desativado' : 'Ativo',
         publicUrl: `/checkout/${routeOfferId}`,
-        label: 'Checkout A'
+        label: product.value?.name || 'Produto'
       }
     }
   }

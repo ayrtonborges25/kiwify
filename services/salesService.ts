@@ -37,7 +37,13 @@ const formatCurrency = (amount?: number | null, currency = 'BRL') => {
 
 const formatDate = (date?: string | null) => {
   if (!date) return ''
-  return new Intl.DateTimeFormat('pt-BR').format(new Date(date))
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(date)).replace(',', '')
 }
 
 const formatStatus = (status?: string | null) => {

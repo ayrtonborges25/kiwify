@@ -45,6 +45,6 @@ export const offers: Offer[] = [
     isDefault: true,
     status: 'Ativo',
     publicUrl: '/checkout/offer-1121e0c0-default',
-    label: 'Checkout A'
+    label: 'Clube dos Fotógrafos...'
   }
 ]

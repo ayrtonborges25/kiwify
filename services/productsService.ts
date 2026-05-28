@@ -109,6 +109,7 @@ const ensureDefaultOfferInSupabase = async (product: ProductDetails) => {
     ? product.settings.paymentMethods
     : paymentMethodsFromSetting(product.settings?.paymentMethod)
   const checkoutSettings = checkoutSettingsFromProductSettings(product.settings)
+  const productName = product.name || 'Oferta principal'
 
   const { data: existingOffer } = await supabase
     .from('offers')
@@ -121,7 +122,7 @@ const ensureDefaultOfferInSupabase = async (product: ProductDetails) => {
     await supabase
       .from('offers')
       .update({
-        name: product.name || 'Oferta principal',
+        name: productName,
         price: parsePrice(product.price),
         currency: product.currency || 'BRL',
         payment_methods: paymentMethods,
@@ -129,6 +130,14 @@ const ensureDefaultOfferInSupabase = async (product: ProductDetails) => {
         status: product.status === 'Ativo' ? 'active' : 'inactive'
       })
       .eq('id', existingOffer.id)
+
+    await supabase
+      .from('product_links')
+      .update({
+        label: productName,
+        title: productName
+      })
+      .eq('offer_id', existingOffer.id)
     return
   }
 
@@ -136,8 +145,8 @@ const ensureDefaultOfferInSupabase = async (product: ProductDetails) => {
     .from('offers')
     .insert({
       product_id: product.id,
-      name: product.name || 'Oferta principal',
-      slug: `${normalizeSlug(product.name || product.id)}-${product.id.slice(0, 8)}`,
+      name: productName,
+      slug: `${normalizeSlug(productName || product.id)}-${product.id.slice(0, 8)}`,
       price: parsePrice(product.price),
       currency: product.currency || 'BRL',
       payment_methods: paymentMethods,
@@ -154,8 +163,8 @@ const ensureDefaultOfferInSupabase = async (product: ProductDetails) => {
     product_id: product.id,
     offer_id: offer.id,
     public_url: `/checkout/${offer.id}`,
-    label: 'Checkout A',
-    title: 'Checkout A',
+    label: productName,
+    title: productName,
     url: `/checkout/${offer.id}`,
     type: 'Checkout',
     status: product.status === 'Ativo' ? 'Ativo' : 'Desativado'

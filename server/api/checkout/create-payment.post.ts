@@ -237,8 +237,8 @@ const resolveCheckoutOffer = async (supabase: NonNullable<ReturnType<typeof getS
     product_id: product.id,
     offer_id: createdOffer.id,
     public_url: `/checkout/${createdOffer.id}`,
-    label: 'Checkout A',
-    title: 'Checkout A',
+    label: product.name || 'Oferta principal',
+    title: product.name || 'Oferta principal',
     url: `/checkout/${createdOffer.id}`,
     type: 'Checkout',
     status: 'Ativo'

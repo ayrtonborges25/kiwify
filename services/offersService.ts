@@ -66,23 +66,27 @@ const productIdFromDefaultOfferId = (id: string) => {
   return id.endsWith(defaultOfferSuffix) ? id.slice(0, -defaultOfferSuffix.length) : ''
 }
 
-const mapOfferFromSupabase = (row: Record<string, any>): Offer => ({
-  id: row.id,
-  productId: row.product_id,
-  checkoutId: row.checkout_id || undefined,
-  name: row.name || 'Oferta',
-  slug: row.slug || normalizeSlug(row.name || row.id),
-  price: formatPrice(row.price, row.currency || 'BRL'),
-  currency: row.currency || 'BRL',
-  paymentMethods: Array.isArray(row.payment_methods) ? row.payment_methods : ['credit_card', 'pix', 'boleto'],
-  settings: row.settings || {},
-  isDefault: Boolean(row.is_default),
-  status: row.status === 'inactive' || row.status === 'Desativado' ? 'Desativado' : 'Ativo',
-  publicUrl: row.product_links?.[0]?.public_url || publicUrlFor(row.id),
-  label: row.product_links?.[0]?.label || shortLabel(row.name || 'Oferta'),
-  createdAt: row.created_at,
-  updatedAt: row.updated_at
-})
+const mapOfferFromSupabase = (row: Record<string, any>): Offer => {
+  const name = row.name || 'Oferta'
+
+  return {
+    id: row.id,
+    productId: row.product_id,
+    checkoutId: row.checkout_id || undefined,
+    name,
+    slug: row.slug || normalizeSlug(name || row.id),
+    price: formatPrice(row.price, row.currency || 'BRL'),
+    currency: row.currency || 'BRL',
+    paymentMethods: Array.isArray(row.payment_methods) ? row.payment_methods : ['credit_card', 'pix', 'boleto'],
+    settings: row.settings || {},
+    isDefault: Boolean(row.is_default),
+    status: row.status === 'inactive' || row.status === 'Desativado' ? 'Desativado' : 'Ativo',
+    publicUrl: row.product_links?.[0]?.public_url || publicUrlFor(row.id),
+    label: Boolean(row.is_default) ? shortLabel(name) : (row.product_links?.[0]?.label || shortLabel(name)),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  }
+}
 
 const productToDefaultOffer = (product: ProductDetails): Offer => ({
   id: `${product.id}-default-offer`,
