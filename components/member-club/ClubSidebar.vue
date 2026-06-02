@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { signOut } from '~/services/authService'
 import type { MemberClub } from '~/data/memberClub'
 
 const props = defineProps<{
@@ -22,6 +23,26 @@ const sidebarTextColor = computed(() => sidebar.value.textColor || '#111827')
 const avatarUrl = computed(() => currentUser.value.avatarUrl)
 const accountName = computed(() => currentUser.value.name || currentUser.value.company || currentUser.value.email || 'Usuário')
 const isCollapsed = computed(() => props.collapsed ?? Boolean(sidebar.value.collapsed))
+const accountMenuOpen = ref(false)
+
+watch(isCollapsed, (collapsed) => {
+  if (collapsed) accountMenuOpen.value = false
+})
+
+const toggleAccountMenu = () => {
+  if (isCollapsed.value) return
+  accountMenuOpen.value = !accountMenuOpen.value
+}
+
+const closeAccountMenu = () => {
+  accountMenuOpen.value = false
+}
+
+const logout = async () => {
+  closeAccountMenu()
+  await signOut()
+  await navigateTo('/student/login')
+}
 </script>
 
 <template>
@@ -63,13 +84,35 @@ const isCollapsed = computed(() => props.collapsed ?? Boolean(sidebar.value.coll
       </a>
     </nav>
 
-    <div class="club-sidebar__account">
-      <img v-if="avatarUrl" :src="avatarUrl" alt="" class="club-sidebar__avatar">
-      <div v-else class="club-sidebar__avatar" />
-      <strong v-if="!isCollapsed">{{ accountName }}</strong>
-      <svg v-if="!isCollapsed" class="club-sidebar__account-caret" viewBox="0 0 20 20" aria-hidden="true">
-        <path fill="currentColor" d="M10 6.75a.75.75 0 0 1 .53.22l4 4a.75.75 0 1 1-1.06 1.06L10 8.56l-3.47 3.47a.75.75 0 0 1-1.06-1.06l4-4a.75.75 0 0 1 .53-.22Z" />
-      </svg>
+    <div class="club-sidebar__account-wrap">
+      <button
+        type="button"
+        class="club-sidebar__account"
+        :aria-expanded="accountMenuOpen"
+        aria-haspopup="menu"
+        @click="toggleAccountMenu"
+      >
+        <img v-if="avatarUrl" :src="avatarUrl" alt="" class="club-sidebar__avatar">
+        <div v-else class="club-sidebar__avatar" />
+        <strong v-if="!isCollapsed">{{ accountName }}</strong>
+        <svg v-if="!isCollapsed" class="club-sidebar__account-caret" :class="{ 'club-sidebar__account-caret--open': accountMenuOpen }" viewBox="0 0 20 20" aria-hidden="true">
+          <path fill="currentColor" d="M10 6.75a.75.75 0 0 1 .53.22l4 4a.75.75 0 1 1-1.06 1.06L10 8.56l-3.47 3.47a.75.75 0 0 1-1.06-1.06l4-4a.75.75 0 0 1 .53-.22Z" />
+        </svg>
+      </button>
+      <div v-if="accountMenuOpen && !isCollapsed" class="club-sidebar__account-menu" role="menu">
+        <NuxtLink to="/myprofile" class="club-sidebar__account-menu-item" role="menuitem" @click="closeAccountMenu">
+          <span class="club-sidebar__account-menu-icon">
+            <svg viewBox="0 0 448 512" aria-hidden="true"><path fill="currentColor" d="M224 256A128 128 0 1 0 224 0a128 128 0 1 0 0 256m89.6 32h-16.7c-22.2 10.2-46.9 16-72.9 16s-50.6-5.8-72.9-16h-16.7C60.2 288 0 348.2 0 422.4V464c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48v-41.6c0-74.2-60.2-134.4-134.4-134.4" /></svg>
+          </span>
+          <span>Meu perfil</span>
+        </NuxtLink>
+        <button type="button" class="club-sidebar__account-menu-item" role="menuitem" @click="logout">
+          <span class="club-sidebar__account-menu-icon">
+            <svg viewBox="0 0 512 512" aria-hidden="true"><path fill="currentColor" d="M497 273 329 441c-15 15-41 4.5-41-17v-96H152c-13.3 0-24-10.7-24-24v-80c0-13.3 10.7-24 24-24h136V104c0-21.4 25.9-32 41-17l168 168c9.3 9.4 9.3 24.6 0 34zM192 436v-40c0-6.6-5.4-12-12-12H96c-17.7 0-32-14.3-32-32V160c0-17.7 14.3-32 32-32h84c6.6 0 12-5.4 12-12V76c0-6.6-5.4-12-12-12H96C43 64 0 107 0 160v192c0 53 43 96 96 96h84c6.6 0 12-5.4 12-12" /></svg>
+          </span>
+          <span>Sair</span>
+        </button>
+      </div>
     </div>
   </aside>
 </template>
@@ -246,16 +289,25 @@ const isCollapsed = computed(() => props.collapsed ?? Boolean(sidebar.value.coll
   height: 20px;
 }
 
+.club-sidebar__account-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
 .club-sidebar__account {
-  position: static;
+  width: 100%;
   height: 64px;
   min-height: 64px;
-  flex: 0 0 64px;
   padding: 8px 16px;
+  border: 0;
   border-top: 1px solid rgba(17, 24, 39, .24);
   display: flex;
   align-items: center;
   gap: 12px;
+  color: currentColor;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
 }
 
 .club-sidebar--collapsed .club-sidebar__account {
@@ -263,6 +315,10 @@ const isCollapsed = computed(() => props.collapsed ?? Boolean(sidebar.value.coll
   padding: 8px 0;
   justify-content: center;
   gap: 0;
+}
+
+.club-sidebar__account:focus {
+  outline: none;
 }
 
 .club-sidebar__avatar {
@@ -289,6 +345,62 @@ const isCollapsed = computed(() => props.collapsed ?? Boolean(sidebar.value.coll
   width: 20px;
   height: 20px;
   flex: 0 0 20px;
+  transition: transform .15s ease;
+}
+
+.club-sidebar__account-caret--open {
+  transform: rotate(180deg);
+}
+
+.club-sidebar__account-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 64px;
+  z-index: 50;
+  padding: 12px 0 14px;
+  border-top: 1px solid rgba(17, 24, 39, .24);
+  background: inherit;
+  color: inherit;
+  box-shadow: 0 -10px 24px rgba(17, 24, 39, .08);
+}
+
+.club-sidebar__account-menu-item {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 24px;
+  border: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: currentColor;
+  background: transparent;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+}
+
+.club-sidebar__account-menu-item:hover,
+.club-sidebar__account-menu-item:focus {
+  outline: none;
+  background: rgba(17, 24, 39, .08);
+}
+
+.club-sidebar__account-menu-icon {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.club-sidebar__account-menu-icon svg {
+  width: 18px;
+  height: 18px;
 }
 
 @media (max-width: 900px) {
