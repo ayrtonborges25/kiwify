@@ -22,6 +22,7 @@ const sidebarColor = computed(() => theme.value.sidebarColor || customization.va
 const sidebarTextColor = computed(() => sidebar.value.textColor || '#111827')
 const avatarUrl = computed(() => currentUser.value.avatarUrl)
 const accountName = computed(() => currentUser.value.name || currentUser.value.company || currentUser.value.email || 'Usuário')
+const avatarInitial = computed(() => (currentUser.value.company || currentUser.value.name || currentUser.value.email || 'U').slice(0, 1).toUpperCase())
 const isCollapsed = computed(() => props.collapsed ?? Boolean(sidebar.value.collapsed))
 const accountMenuOpen = ref(false)
 
@@ -93,7 +94,7 @@ const logout = async () => {
         @click="toggleAccountMenu"
       >
         <img v-if="avatarUrl" :src="avatarUrl" alt="" class="club-sidebar__avatar">
-        <div v-else class="club-sidebar__avatar" />
+        <span v-else class="club-sidebar__avatar club-sidebar__avatar--initial">{{ avatarInitial }}</span>
         <strong v-if="!isCollapsed">{{ accountName }}</strong>
         <svg v-if="!isCollapsed" class="club-sidebar__account-caret" :class="{ 'club-sidebar__account-caret--open': accountMenuOpen }" viewBox="0 0 20 20" aria-hidden="true">
           <path fill="currentColor" d="M10 6.75a.75.75 0 0 1 .53.22l4 4a.75.75 0 1 1-1.06 1.06L10 8.56l-3.47 3.47a.75.75 0 0 1-1.06-1.06l4-4a.75.75 0 0 1 .53-.22Z" />
@@ -326,8 +327,18 @@ const logout = async () => {
   height: 40px;
   flex: 0 0 40px;
   border-radius: 999px;
-  background: linear-gradient(110deg, #008a48, #00130b);
+  background: #f3f4f6;
   object-fit: cover;
+}
+
+.club-sidebar__avatar--initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #374151;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
 }
 
 .club-sidebar__account strong {
