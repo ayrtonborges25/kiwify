@@ -20,6 +20,7 @@ const links = computed(() => sidebar.value.links || {})
 const sidebarColor = computed(() => theme.value.sidebarColor || customization.value.sidebarColor || '#ffcc00')
 const sidebarTextColor = computed(() => sidebar.value.textColor || '#111827')
 const avatarUrl = computed(() => currentUser.value.avatarUrl)
+const accountName = computed(() => currentUser.value.name || currentUser.value.company || currentUser.value.email || 'Usuário')
 const isCollapsed = computed(() => props.collapsed ?? Boolean(sidebar.value.collapsed))
 </script>
 
@@ -65,7 +66,7 @@ const isCollapsed = computed(() => props.collapsed ?? Boolean(sidebar.value.coll
     <div class="club-sidebar__account">
       <img v-if="avatarUrl" :src="avatarUrl" alt="" class="club-sidebar__avatar">
       <div v-else class="club-sidebar__avatar" />
-      <strong v-if="!isCollapsed">{{ sidebar.brandName || club?.brandName || 'RETRATISTAS DIGITAIS' }}</strong>
+      <strong v-if="!isCollapsed">{{ accountName }}</strong>
       <svg v-if="!isCollapsed" class="club-sidebar__account-caret" viewBox="0 0 20 20" aria-hidden="true">
         <path fill="currentColor" d="M10 6.75a.75.75 0 0 1 .53.22l4 4a.75.75 0 1 1-1.06 1.06L10 8.56l-3.47 3.47a.75.75 0 0 1-1.06-1.06l4-4a.75.75 0 0 1 .53-.22Z" />
       </svg>

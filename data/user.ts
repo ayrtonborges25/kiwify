@@ -1,5 +1,6 @@
 export const currentUser = {
   id: '371cb1af-8d3e-453d-b837-142f505a8dbc',
+  email: 'ayrtonborgesfotografias@gmail.com',
   name: 'Ayrton Borges',
   company: 'Ayrton Borges',
   initials: 'AB',

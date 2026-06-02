@@ -10,6 +10,7 @@ const mapProfileFromSupabase = (row: Record<string, any>, workspaceName = '') =>
   return {
     ...currentUserStore,
     id: row.id || currentUserStore.id,
+    email: row.email || currentUserStore.email,
     name: displayName,
     company: displayName,
     initials: row.initials || currentUserStore.initials,
