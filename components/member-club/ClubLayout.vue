@@ -235,12 +235,20 @@ const lessonDescriptionParts = computed(() => {
   min-height: 100vh;
   background: #080808;
   color: #fff;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  overflow-x: hidden;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .club-page__content {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
   min-height: 100vh;
-  margin-left: 256px !important;
+  margin-left: 0 !important;
+  overflow-x: hidden;
 }
 
 .club-banner-empty {
@@ -249,15 +257,28 @@ const lessonDescriptionParts = computed(() => {
   background: #fff;
 }
 
+.club-editable-section--banner {
+  display: block;
+  margin: 0;
+  padding: 0;
+  line-height: 0;
+}
+
+.club-editable-section--banner picture,
+.club-editable-section--banner source {
+  display: block;
+}
+
 .club-editable-section--banner img,
 .club-editable-section--banner .club-banner-empty {
+  display: block;
   width: 100%;
   aspect-ratio: 768 / 432;
   object-fit: cover;
 }
 
 .club-page__content--collapsed {
-  margin-left: 88px !important;
+  margin-left: 0 !important;
 }
 
 .club-page__content--lesson {
