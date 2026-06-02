@@ -76,14 +76,16 @@ const isCollapsed = computed(() => props.collapsed ?? Boolean(sidebar.value.coll
 
 <style scoped>
 .club-sidebar {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 20;
+  flex: 0 0 256px;
+  align-self: stretch;
   width: 256px !important;
   min-width: 256px !important;
   max-width: 256px !important;
-  height: 100vh;
-  max-height: 100vh;
+  min-height: 100vh;
+  height: auto;
+  max-height: none;
   background: #ffcc00;
   color: #111827;
   border-right: 1px solid rgba(17, 24, 39, .28);
@@ -102,6 +104,7 @@ const isCollapsed = computed(() => props.collapsed ?? Boolean(sidebar.value.coll
 }
 
 .club-sidebar--collapsed {
+  flex-basis: 88px;
   width: 88px !important;
   min-width: 88px !important;
   max-width: 88px !important;

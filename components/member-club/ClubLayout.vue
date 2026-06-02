@@ -75,12 +75,13 @@ const lessonDescriptionParts = computed(() => {
 </script>
 
 <template>
-  <main class="club-page" :class="{ 'club-page--editor-preview': isEditorPreview, 'club-page--lesson-open': activeLesson }" :style="{ backgroundColor: theme.backgroundColor || customization.backgroundColor || '#080808', color: theme.textColor || customization.textColor || '#ffffff' }">
+  <div id="club" class="club-page" :class="{ 'club-page--editor-preview': isEditorPreview, 'club-page--lesson-open': activeLesson }" :style="{ backgroundColor: theme.backgroundColor || customization.backgroundColor || '#080808', color: theme.textColor || customization.textColor || '#ffffff' }">
     <ClubSidebar v-if="!activeLesson" :club="data?.club" :progress="progress" :editor-preview="isEditorPreview" :collapsed="sidebarCollapsed" @toggle="toggleSidebar" />
 
-    <section class="club-page__content" :class="{ 'club-page__content--collapsed': sidebarCollapsed, 'club-page__content--lesson': activeLesson }">
-      <div v-if="loading" class="club-page__state">Carregando...</div>
-      <div v-else-if="error" class="club-page__state">{{ error }}</div>
+    <aside id="club__content" class="club-page__content" :class="{ 'club-page__content--collapsed': sidebarCollapsed, 'club-page__content--lesson': activeLesson }">
+      <main id="club__content__main" class="club-page__content-main">
+        <div v-if="loading" class="club-page__state">Carregando...</div>
+        <div v-else-if="error" class="club-page__state">{{ error }}</div>
       <section v-else-if="activeLesson" class="club-lesson-view">
         <div class="club-lesson-view__main">
           <button type="button" class="club-lesson-view__back" aria-label="Voltar" @click="activeLesson = undefined">
@@ -126,43 +127,9 @@ const lessonDescriptionParts = computed(() => {
         </aside>
       </section>
       <template v-else>
-        <section v-if="showBanner" data-kiwi-section-id="M7IADU" class="club-editable-section club-editable-section--banner">
-          <div v-if="isEditorPreview" class="club-editable-section__move">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="22" height="22"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
-          </div>
-          <div v-if="isEditorPreview" class="club-editable-section__actions">
-            <button type="button" aria-label="Configurar"><svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.53 1.53 0 01-2.28.95c-1.37-.84-2.94.73-2.1 2.1.54.88.06 2.03-.95 2.28-1.56.38-1.56 2.6 0 2.98 1.01.25 1.49 1.4.95 2.28-.84 1.37.73 2.94 2.1 2.1.88-.54 2.03-.06 2.28.95.38 1.56 2.6 1.56 2.98 0 .25-1.01 1.4-1.49 2.28-.95 1.37.84 2.94-.73 2.1-2.1-.54-.88-.06-2.03.95-2.28 1.56-.38 1.56-2.6 0-2.98a1.53 1.53 0 01-.95-2.28c.84-1.37-.73-2.94-2.1-2.1a1.53 1.53 0 01-2.28-.95zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"></path></svg></button>
-            <button type="button" aria-label="Duplicar"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>
-            <button type="button" aria-label="Excluir"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
-          </div>
-          <div class="embla relative overflow-hidden group" data-slides-delay="5" data-embla-options="{ &quot;loop&quot;: true, &quot;dragFree&quot;: false, &quot;active&quot;: false }">
-            <div class="embla__viewport overflow-hidden">
-              <div class="embla__container flex">
-                <div v-for="slide in (slides.length ? slides : [{ id: 'slide-1', imageUrl: heroImage }])" :key="slide.id" class="embla__slide flex-shrink-0 w-screen max-w-full">
-                  <picture v-if="safeClubImage(slide.imageUrl || heroImage)">
-                    <source :srcset="safeClubImage(slide.imageUrl || heroImage)">
-                    <img
-                      :src="safeClubImage(slide.imageUrl || heroImage)"
-                      @error="($event.target as HTMLImageElement).remove()"
-                      alt=""
-                      loading="lazy"
-                      width="2000"
-                      height="590"
-                      class="select-none pointer-events-none w-full aspect-[768/432] sm:aspect-[2000/590] object-cover"
-                    >
-                  </picture>
-                  <div v-else class="club-banner-empty" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section data-kiwi-section-id="continue-watching"></section>
-
-        <section class="club-page__inner">
-          <template v-for="section in visibleSections" :key="section.id">
-            <div v-if="section.type === 'modules'" class="club-page__section club-editable-section">
+        <div class="club-page__content-shell">
+          <div class="club-page__overflow">
+            <section v-if="showBanner" data-kiwi-section-id="M7IADU" class="club-editable-section club-editable-section--banner">
               <div v-if="isEditorPreview" class="club-editable-section__move">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="22" height="22"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
               </div>
@@ -171,54 +138,93 @@ const lessonDescriptionParts = computed(() => {
                 <button type="button" aria-label="Duplicar"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>
                 <button type="button" aria-label="Excluir"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
               </div>
-              <ModuleList
-                :modules="modules"
-                :expanded-module-ids="expandedModuleIds"
-                :current-lesson-id="currentLesson?.id"
-                :completed-lesson-ids="completedLessonIds"
-                :show-lessons="!isEditorPreview"
-                @toggle-module="$emit('toggleModule', $event)"
-                @select-lesson="$emit('selectLesson', $event)"
-                @open-module="openModule"
-              />
-              <button v-if="isEditorPreview" type="button" class="club-editable-section__add">ADICIONAR SEÇÃO</button>
-            </div>
-            <section v-else-if="section.type === 'courses'" id="section__" class="kiwi-section relative z-0 hover:z-10 has-[:focus]:z-20 px-6 md:px-12 pb-6 md:pb-12 content-section content-section--courses" data-kiwi-section-id="">
-              <div class="pt-8">
-                <h2 id="section____title" class="kiwi-section__title font-semibold text-xl drop-shadow-hard-light dark:drop-shadow-hard mb-1 sm:mb-3 flex flex-row items-center gap-2 relative z-20">{{ section.title || 'Ou cursos inteiros' }}</h2>
-                <div class="embla relative group" data-embla-options="{ &quot;loop&quot;: false, &quot;dragFree&quot;: true }">
-                  <div class="embla__viewport">
-                    <div class="embla__container flex items-start gap-4 *:flex-grow-0 *:flex-shrink-0 *:basis-auto *:min-w-0 *:max-w-full">
-                      <div class="embla__slide cursor-pointer focus:scale-105 hover:scale-105 relative sci group/sci block z-0 hover:z-10 rounded-lg transform transition-all ease-in-out duration-300 scale-100 w-5/12 md:w-64">
-                        <div class="relative">
-                          <figure class="rounded-t-lg sci__img z-10 relative select-none leading-[0px]">
-                            <img v-if="safeClubImage(data?.course.coverUrl)" width="400" height="600" :src="safeClubImage(data?.course.coverUrl)" @error="($event.target as HTMLImageElement).remove()" class="rounded-lg select-none transition-all ease-in-out duration-300 bg-primary object-contain aspect-[2/3]" style="aspect-ratio: 400 / 600;">
-                          </figure>
-                          <div class="absolute inset-x-0 bottom-0 z-10 py-3 px-4 pb-4">
-                            <h3 class="font-bold text-base md:text-lg line-clamp-2">{{ data?.course.title }}</h3>
-                          </div>
-                        </div>
-                      </div>
+              <div class="embla relative overflow-hidden group" data-slides-delay="5" data-embla-options="{ &quot;loop&quot;: true, &quot;dragFree&quot;: false, &quot;active&quot;: false }">
+                <div class="embla__viewport overflow-hidden">
+                  <div class="embla__container flex">
+                    <div v-for="slide in (slides.length ? slides : [{ id: 'slide-1', imageUrl: heroImage }])" :key="slide.id" class="embla__slide flex-shrink-0 w-screen max-w-full">
+                      <picture v-if="safeClubImage(slide.imageUrl || heroImage)">
+                        <source :srcset="safeClubImage(slide.imageUrl || heroImage)">
+                        <img
+                          :src="safeClubImage(slide.imageUrl || heroImage)"
+                          @error="($event.target as HTMLImageElement).remove()"
+                          alt=""
+                          loading="lazy"
+                          width="2000"
+                          height="590"
+                          class="select-none pointer-events-none w-full aspect-[768/432] sm:aspect-[2000/590] object-cover"
+                        >
+                      </picture>
+                      <div v-else class="club-banner-empty" />
                     </div>
                   </div>
                 </div>
               </div>
             </section>
-            <div v-else class="club-page__section club-page__custom-section">
-              <div>
-                <h2>{{ section.title }}</h2>
-                <p v-if="section.subtitle">{{ section.subtitle }}</p>
-              </div>
-              <img v-if="safeClubImage(section.imageUrl)" :src="safeClubImage(section.imageUrl)" alt="">
-            </div>
-          </template>
-        </section>
+
+            <section data-kiwi-section-id="continue-watching"></section>
+
+            <section class="club-page__inner">
+              <template v-for="section in visibleSections" :key="section.id">
+                <div v-if="section.type === 'modules'" class="club-page__section club-page__section--modules club-editable-section">
+                  <div v-if="isEditorPreview" class="club-editable-section__move">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="22" height="22"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
+                  </div>
+                  <div v-if="isEditorPreview" class="club-editable-section__actions">
+                    <button type="button" aria-label="Configurar"><svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.53 1.53 0 01-2.28.95c-1.37-.84-2.94.73-2.1 2.1.54.88.06 2.03-.95 2.28-1.56.38-1.56 2.6 0 2.98 1.01.25 1.49 1.4.95 2.28-.84 1.37.73 2.94 2.1 2.1.88-.54 2.03-.06 2.28.95.38 1.56 2.6 1.56 2.98 0 .25-1.01 1.4-1.49 2.28-.95 1.37.84 2.94-.73 2.1-2.1-.54-.88-.06-2.03.95-2.28 1.56-.38 1.56-2.6 0-2.98a1.53 1.53 0 01-.95-2.28c.84-1.37-.73-2.94-2.1-2.1a1.53 1.53 0 01-2.28-.95zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"></path></svg></button>
+                    <button type="button" aria-label="Duplicar"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>
+                    <button type="button" aria-label="Excluir"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                  </div>
+                  <ModuleList
+                    :modules="modules"
+                    :expanded-module-ids="expandedModuleIds"
+                    :current-lesson-id="currentLesson?.id"
+                    :completed-lesson-ids="completedLessonIds"
+                    :show-lessons="!isEditorPreview"
+                    @toggle-module="$emit('toggleModule', $event)"
+                    @select-lesson="$emit('selectLesson', $event)"
+                    @open-module="openModule"
+                  />
+                  <button v-if="isEditorPreview" type="button" class="club-editable-section__add">ADICIONAR SEÇÃO</button>
+                </div>
+                <section v-else-if="section.type === 'courses'" id="section__" class="kiwi-section relative z-0 hover:z-10 has-[:focus]:z-20 px-6 md:px-12 pb-6 md:pb-12 content-section content-section--courses" data-kiwi-section-id="">
+                  <div class="pt-8">
+                    <h2 id="section____title" class="kiwi-section__title font-semibold text-xl drop-shadow-hard-light dark:drop-shadow-hard mb-1 sm:mb-3 flex flex-row items-center gap-2 relative z-20">{{ section.title || 'Ou cursos inteiros' }}</h2>
+                    <div class="embla relative group" data-embla-options="{ &quot;loop&quot;: false, &quot;dragFree&quot;: true }">
+                      <div class="embla__viewport">
+                        <div class="embla__container flex items-start gap-4 *:flex-grow-0 *:flex-shrink-0 *:basis-auto *:min-w-0 *:max-w-full">
+                          <div class="embla__slide cursor-pointer focus:scale-105 hover:scale-105 relative sci group/sci block z-0 hover:z-10 rounded-lg transform transition-all ease-in-out duration-300 scale-100 w-5/12 md:w-64">
+                            <div class="relative">
+                              <figure class="rounded-t-lg sci__img z-10 relative select-none leading-[0px]">
+                                <img v-if="safeClubImage(data?.course.coverUrl)" width="400" height="600" :src="safeClubImage(data?.course.coverUrl)" @error="($event.target as HTMLImageElement).remove()" class="rounded-lg select-none transition-all ease-in-out duration-300 bg-primary object-contain aspect-[2/3]" style="aspect-ratio: 400 / 600;">
+                              </figure>
+                              <div class="absolute inset-x-0 bottom-0 z-10 py-3 px-4 pb-4">
+                                <h3 class="font-bold text-base md:text-lg line-clamp-2">{{ data?.course.title }}</h3>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+                <div v-else class="club-page__section club-page__custom-section">
+                  <div>
+                    <h2>{{ section.title }}</h2>
+                    <p v-if="section.subtitle">{{ section.subtitle }}</p>
+                  </div>
+                  <img v-if="safeClubImage(section.imageUrl)" :src="safeClubImage(section.imageUrl)" alt="">
+                </div>
+              </template>
+            </section>
+          </div>
+        </div>
         <footer class="py-6 px-4 text-xs flex flex-row items-center justify-center gap-2 hidden md:flex" id="club__content__footer">
           <span><strong>{{ data?.course.title || data?.club.title }}</strong> is powered by </span>
           <a href="https://kiwify.com.br" rel="noopener noreferrer" target="kiwify" class="leading-[0px] p-1 -m-1 rounded">Kiwify</a>
         </footer>
       </template>
-    </section>
+      </main>
+    </aside>
 
     <aside class="fixed bottom-0 inset-x-0 z-20 md:hidden bg-primary-500" id="club__bottom_nav">
       <nav class="py-2 px-2 flex flex-row items-center justify-around gap-2">
@@ -227,18 +233,25 @@ const lessonDescriptionParts = computed(() => {
         <a :href="data?.club.supportUrl || '#'" rel="noopener noreferrer" class="flex flex-col items-center justify-center text-center font-medium rounded-md border focus:outline-none transition ease-in-out duration-150 text-primary-foreground border-transparent leading-3 text-xs p-0 gap-0 cursor-pointer w-11 h-9" title="Suporte">Sup</a>
       </nav>
     </aside>
-  </main>
+  </div>
 </template>
 
 <style scoped>
 .club-page {
+  width: 100%;
   min-height: 100vh;
+  height: 100vh;
+  min-height: 100svh;
+  height: 100svh;
   background: #080808;
   color: #fff;
   display: flex;
+  flex-direction: row;
   align-items: stretch;
   justify-content: flex-start;
-  overflow-x: hidden;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -246,9 +259,43 @@ const lessonDescriptionParts = computed(() => {
   flex: 1 1 auto;
   width: auto;
   min-width: 0;
-  min-height: 100vh;
+  max-height: calc(100svh - 3.25rem);
+  min-height: 0;
+  padding-bottom: 3.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   margin-left: 0 !important;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
   overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.club-page__content-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.club-page__content-shell {
+  width: 100%;
+  min-height: 100vh;
+  position: relative;
+  margin: 0;
+  padding: 0;
+}
+
+.club-page__overflow {
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
 }
 
 .club-banner-empty {
@@ -288,11 +335,16 @@ const lessonDescriptionParts = computed(() => {
 .club-page__inner {
   max-width: none;
   padding: 0;
+  margin: 0;
 }
 
 .club-page__section {
   position: relative;
-  margin-bottom: 42px;
+  margin: 0;
+}
+
+.club-page__section--modules {
+  margin: 0;
 }
 
 .content-section {
@@ -610,16 +662,29 @@ const lessonDescriptionParts = computed(() => {
 }
 
 @media (max-width: 900px) {
-  .club-page__content {
-    margin-left: 0;
+  .club-page {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100svh;
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
-  .club-page__hero {
-    height: 300px;
+  .club-page__content {
+    max-height: none;
+    min-height: 0;
+    margin-left: 0;
+    padding-bottom: 0;
+    overflow: visible;
+  }
+
+  .club-page__content-shell {
+    min-height: 0;
   }
 
   .club-page__inner {
-    padding: 28px 20px 60px;
+    padding: 0;
   }
 }
 
