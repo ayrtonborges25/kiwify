@@ -21,7 +21,7 @@ const acceptText = computed(() => String(upsellSettings.value?.acceptText || 'Si
 const declineText = computed(() => String(upsellSettings.value?.declineText || 'Não, eu gostaria de recusar essa oferta'))
 const resolvedOfferId = computed(() => String(upsellSettings.value?.offerId || queryOfferId.value || ''))
 const upsellOfferUrl = computed(() => String(upsellSettings.value?.offerUrl || (resolvedOfferId.value ? `/checkout/${resolvedOfferId.value}` : '')))
-const accessUrl = computed(() => sale.value?.productId ? `/club=${sale.value.productId}` : '/')
+const accessUrl = computed(() => '/courses')
 
 const acceptUpsell = async () => {
   if (!saleId.value || submitting.value) return

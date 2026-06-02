@@ -12,7 +12,9 @@ $$;
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
+  email text,
   name text,
+  role text not null default 'student',
   company text,
   initials text,
   avatar_url text,
@@ -106,6 +108,7 @@ create table if not exists public.checkout_settings (
 
 create table if not exists public.sales (
   id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete set null,
   product_id uuid references public.products(id) on delete set null,
   customer_name text,
   customer_email text,
@@ -193,6 +196,7 @@ create table if not exists public.uploads (
 
 create table if not exists public.product_deliveries (
   id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete set null,
   sale_id uuid references public.sales(id) on delete cascade,
   product_id uuid references public.products(id) on delete set null,
   customer_email text,
@@ -200,6 +204,19 @@ create table if not exists public.product_deliveries (
   access_url text,
   status text default 'active',
   access_email_sent_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.password_reset_codes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
+  email text not null,
+  code_hash text not null,
+  request_ip text,
+  user_agent text,
+  attempts integer not null default 0,
+  expires_at timestamptz not null,
+  consumed_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -282,6 +299,7 @@ alter table public.checkout_settings add column if not exists created_at timesta
 alter table public.checkout_settings add column if not exists updated_at timestamptz not null default now();
 
 alter table public.sales add column if not exists product_id uuid references public.products(id) on delete set null;
+alter table public.sales add column if not exists user_id uuid references auth.users(id) on delete set null;
 alter table public.sales add column if not exists offer_id uuid references public.offers(id) on delete set null;
 alter table public.sales add column if not exists customer_name text;
 alter table public.sales add column if not exists customer_email text;
@@ -356,6 +374,7 @@ alter table public.uploads add column if not exists file_type text;
 alter table public.uploads add column if not exists created_at timestamptz not null default now();
 
 alter table public.product_deliveries add column if not exists sale_id uuid references public.sales(id) on delete cascade;
+alter table public.product_deliveries add column if not exists user_id uuid references auth.users(id) on delete set null;
 alter table public.product_deliveries add column if not exists product_id uuid references public.products(id) on delete set null;
 alter table public.product_deliveries add column if not exists customer_email text;
 alter table public.product_deliveries add column if not exists delivery_type text;
@@ -376,6 +395,7 @@ create index if not exists idx_product_checkouts_product_id on public.product_ch
 create unique index if not exists idx_checkout_settings_checkout_unique on public.checkout_settings(checkout_id);
 create index if not exists idx_checkout_settings_checkout_id on public.checkout_settings(checkout_id);
 create index if not exists idx_sales_product_id on public.sales(product_id);
+create index if not exists idx_sales_user_id on public.sales(user_id);
 create index if not exists idx_sales_offer_id on public.sales(offer_id);
 create index if not exists sales_product_id_idx on public.sales(product_id);
 create index if not exists sales_offer_id_idx on public.sales(offer_id);
@@ -390,6 +410,10 @@ create index if not exists idx_modules_course_id on public.modules(course_id);
 create index if not exists idx_lessons_course_id on public.lessons(course_id);
 create index if not exists idx_uploads_entity on public.uploads(entity_type, entity_id);
 create unique index if not exists idx_product_deliveries_sale_unique on public.product_deliveries(sale_id);
+create index if not exists idx_product_deliveries_user_id on public.product_deliveries(user_id);
+create index if not exists idx_password_reset_codes_email_created_at on public.password_reset_codes (email, created_at desc);
+create index if not exists idx_password_reset_codes_user_id_created_at on public.password_reset_codes (user_id, created_at desc);
+create index if not exists idx_password_reset_codes_expires_at on public.password_reset_codes (expires_at);
 create index if not exists idx_product_deliveries_product_id on public.product_deliveries(product_id);
 create index if not exists product_deliveries_sale_id_idx on public.product_deliveries(sale_id);
 create index if not exists product_deliveries_product_id_idx on public.product_deliveries(product_id);
@@ -454,6 +478,7 @@ alter table public.modules enable row level security;
 alter table public.lessons enable row level security;
 alter table public.uploads enable row level security;
 alter table public.product_deliveries enable row level security;
+alter table public.password_reset_codes enable row level security;
 
 drop policy if exists "profiles authenticated read" on public.profiles;
 create policy "profiles authenticated read" on public.profiles
@@ -630,5 +655,156 @@ for insert to anon, authenticated with check (bucket_id in ('product-images', 'c
 drop policy if exists "clone public storage update" on storage.objects;
 create policy "clone public storage update" on storage.objects
 for update to anon, authenticated using (bucket_id in ('product-images', 'course-videos', 'member-area-covers', 'checkout-assets')) with check (bucket_id in ('product-images', 'course-videos', 'member-area-covers', 'checkout-assets'));
+
+alter table public.profiles add column if not exists email text;
+alter table public.profiles add column if not exists role text not null default 'student';
+alter table public.sales add column if not exists user_id uuid references auth.users(id) on delete set null;
+alter table public.product_deliveries add column if not exists user_id uuid references auth.users(id) on delete set null;
+create index if not exists idx_sales_user_id on public.sales(user_id);
+create index if not exists idx_product_deliveries_user_id on public.product_deliveries(user_id);
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'profiles_role_check'
+      and conrelid = 'public.profiles'::regclass
+  ) then
+    alter table public.profiles add constraint profiles_role_check check (role in ('admin', 'student')) not valid;
+  end if;
+end;
+$$;
+
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = auth.uid()
+      and role = 'admin'
+  );
+$$;
+
+create or replace function public.current_profile_role()
+returns text
+language sql
+security definer
+set search_path = public
+as $$
+  select role
+  from public.profiles
+  where id = auth.uid();
+$$;
+
+create or replace function public.handle_new_auth_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.profiles (id, email, name, role)
+  values (
+    new.id,
+    lower(new.email),
+    coalesce(new.raw_user_meta_data->>'name', ''),
+    coalesce(nullif(new.raw_user_meta_data->>'role', ''), 'student')
+  )
+  on conflict (id) do update
+  set
+    email = excluded.email,
+    name = coalesce(nullif(excluded.name, ''), public.profiles.name),
+    role = coalesce(nullif(excluded.role, ''), public.profiles.role),
+    updated_at = now();
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created_profile on auth.users;
+create trigger on_auth_user_created_profile
+after insert on auth.users
+for each row execute function public.handle_new_auth_user();
+
+drop policy if exists "profiles authenticated read" on public.profiles;
+drop policy if exists "profiles authenticated write" on public.profiles;
+drop policy if exists "profiles own read" on public.profiles;
+drop policy if exists "profiles own update" on public.profiles;
+drop policy if exists "profiles own insert" on public.profiles;
+drop policy if exists "profiles admin read" on public.profiles;
+drop policy if exists "profiles admin write" on public.profiles;
+
+create policy "profiles own read" on public.profiles
+for select to authenticated using (id = auth.uid());
+
+create policy "profiles own update" on public.profiles
+for update to authenticated using (id = auth.uid()) with check (id = auth.uid() and role = public.current_profile_role());
+
+create policy "profiles own insert" on public.profiles
+for insert to authenticated with check (id = auth.uid());
+
+create policy "profiles admin read" on public.profiles
+for select to authenticated using (public.is_admin());
+
+create policy "profiles admin write" on public.profiles
+for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "authenticated sales read" on public.sales;
+drop policy if exists "authenticated sales write" on public.sales;
+drop policy if exists "clone anon sales read" on public.sales;
+drop policy if exists "clone anon sales write" on public.sales;
+drop policy if exists "sales student read own" on public.sales;
+drop policy if exists "sales admin read" on public.sales;
+drop policy if exists "sales admin write" on public.sales;
+
+create policy "sales student read own" on public.sales
+for select to authenticated using (user_id = auth.uid() or lower(customer_email) = lower(auth.jwt()->>'email'));
+
+create policy "sales admin read" on public.sales
+for select to authenticated using (public.is_admin());
+
+create policy "sales admin write" on public.sales
+for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "clone checkout public sale insert" on public.sales;
+create policy "clone checkout public sale insert" on public.sales
+for insert to anon with check (
+  customer_name is not null
+  and customer_email is not null
+  and amount >= 0
+  and coalesce(currency, 'BRL') in ('BRL', 'USD', 'EUR')
+  and status in ('pending', 'approved', 'failed')
+  and payment_method in ('Cartão de crédito', 'Pix', 'Boleto', 'CREDIT_CARD', 'PIX', 'BOLETO')
+  and (provider is null or provider = 'asaas')
+);
+
+drop policy if exists "authenticated deliveries read" on public.product_deliveries;
+drop policy if exists "authenticated deliveries write" on public.product_deliveries;
+drop policy if exists "clone anon deliveries read" on public.product_deliveries;
+drop policy if exists "deliveries student read own" on public.product_deliveries;
+drop policy if exists "deliveries admin read" on public.product_deliveries;
+drop policy if exists "deliveries admin write" on public.product_deliveries;
+
+create policy "deliveries student read own" on public.product_deliveries
+for select to authenticated using (user_id = auth.uid() or lower(customer_email) = lower(auth.jwt()->>'email'));
+
+create policy "deliveries admin read" on public.product_deliveries
+for select to authenticated using (public.is_admin());
+
+create policy "deliveries admin write" on public.product_deliveries
+for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+drop policy if exists "password reset codes admin read" on public.password_reset_codes;
+drop policy if exists "password reset codes admin write" on public.password_reset_codes;
+
+create policy "password reset codes admin read" on public.password_reset_codes
+for select to authenticated using (public.is_admin());
+
+create policy "password reset codes admin write" on public.password_reset_codes
+for all to authenticated using (public.is_admin()) with check (public.is_admin());
 
 notify pgrst, 'reload schema';

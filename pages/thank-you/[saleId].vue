@@ -18,12 +18,8 @@ const isApproved = computed(() => ['approved', 'pago', 'recebido', 'confirmado']
 
 const accessUrl = computed(() => {
   if (finalAccessUrl.value) return finalAccessUrl.value
-  if (delivery.value?.accessUrl) return delivery.value.accessUrl
-
-  const productId = delivery.value?.productId || sale.value?.productId
-  if (productId) return `/club=${productId}`
-
-  return '/'
+  if (delivery.value?.accessUrl || sale.value?.productId) return '/courses'
+  return '/courses'
 })
 const upsellSettings = computed(() => product.value?.settings?.upsellSettings || {})
 const showUpsell = computed(() => {
@@ -60,7 +56,7 @@ onMounted(async () => {
     })
     if (result.sale) sale.value = result.sale
     if (result.delivery) delivery.value = result.delivery
-    finalAccessUrl.value = result.clubUrl || result.delivery?.accessUrl || ''
+    finalAccessUrl.value = '/courses'
   } catch {
     sale.value = await getSaleById(saleId)
     delivery.value = await getDeliveryBySaleId(saleId)
@@ -104,7 +100,7 @@ onMounted(async () => {
           {{ upsellDeclineText }}
         </div>
       </div>
-      <NuxtLink :to="accessUrl" class="thank-you-link">Acessar produto</NuxtLink>
+      <NuxtLink :to="accessUrl" class="thank-you-link">Meus cursos</NuxtLink>
     </section>
   </main>
 </template>

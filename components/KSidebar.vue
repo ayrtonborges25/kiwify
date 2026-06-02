@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const route = useRoute()
 const { currentUser } = useCurrentUser()
-const kiwifyLogo = computed(() => currentUser.value.branding.kiwifyLogo)
+const kiwifyLogo = '/img/kiwify-green-logo.3059fc8.svg'
 const companyName = computed(() => currentUser.value.company)
 const teamMenuOpen = ref(false)
 
@@ -41,7 +41,7 @@ const items = [
         <div class="flex items-center flex-shrink-0 px-2 py-1">
           <button type="button" class="px-2 w-full rounded-md focus:outline-none text-white leading-5 font-medium transition ease-in-out duration-150 hover:bg-green-500" :aria-expanded="teamMenuOpen" @click.stop="toggleTeamMenu">
             <div class="flex flex-shrink-0 items-center w-full py-2">
-              <img :src="kiwifyLogo" alt="Workflow" class="h-10 w-auto mr-2">
+              <img :src="kiwifyLogo" alt="" class="h-10 w-auto mr-2">
               <div class="truncate w-36 text-left">{{ companyName }}</div>
               <svg viewBox="0 0 20 20" fill="currentColor" class="h-5 ml-2 block"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
             </div>

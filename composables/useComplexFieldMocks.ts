@@ -26,6 +26,7 @@ const objectUrls = new Set<string>()
 let imageInput: HTMLInputElement | null = null
 let videoInput: HTMLInputElement | null = null
 let modalRoot: HTMLDivElement | null = null
+let cropStylesInjected = false
 
 const selectOptions: Record<string, string[]> = {
   domain: ['figurinhasdacopa.com', 'digitalborges.com.br', 'kiwify-mock.com'],
@@ -43,6 +44,98 @@ const makeObjectUrl = (file: File) => {
   objectUrls.add(url)
   return url
 }
+
+const escapeAttr = (value: string) => value
+  .replace(/&/g, '&amp;')
+  .replace(/"/g, '&quot;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+
+const ensureCropStyles = () => {
+  if (cropStylesInjected) return
+
+  const style = document.createElement('style')
+  style.dataset.kiwifyCropMock = 'true'
+  style.textContent = `
+    .kiwify-cropper-stage {
+      height: 400px;
+      overflow: hidden;
+      position: relative;
+      width: 100%;
+    }
+
+    .kiwify-cropper-image {
+      display: block;
+      height: 400px;
+      left: 50%;
+      max-height: none !important;
+      max-width: none !important;
+      position: absolute;
+      top: 0;
+      transform: translateX(-50%);
+      width: auto;
+    }
+
+    .kiwify-cropper-crop-box {
+      bottom: 0;
+      height: 400px;
+      left: 50%;
+      position: absolute;
+      top: 0;
+      transform: translateX(-50%);
+      width: 266.6667px;
+    }
+
+    .kiwify-cropper-crop-box .cropper-view-box img {
+      height: 400px;
+      left: 50%;
+      max-height: none !important;
+      max-width: none !important;
+      position: absolute;
+      top: 0;
+      transform: translateX(-50%);
+      width: auto;
+    }
+  `
+  document.head.appendChild(style)
+  cropStylesInjected = true
+}
+
+const cropImageToDataUrl = (url: string) => new Promise<string>((resolve, reject) => {
+  const image = new Image()
+  image.onload = () => {
+    const targetWidth = 320
+    const targetHeight = 480
+    const targetRatio = targetWidth / targetHeight
+    const sourceRatio = image.naturalWidth / image.naturalHeight
+    let sourceWidth = image.naturalWidth
+    let sourceHeight = image.naturalHeight
+    let sourceX = 0
+    let sourceY = 0
+
+    if (sourceRatio > targetRatio) {
+      sourceWidth = image.naturalHeight * targetRatio
+      sourceX = (image.naturalWidth - sourceWidth) / 2
+    } else {
+      sourceHeight = image.naturalWidth / targetRatio
+      sourceY = (image.naturalHeight - sourceHeight) / 2
+    }
+
+    const canvas = document.createElement('canvas')
+    canvas.width = targetWidth
+    canvas.height = targetHeight
+    const context = canvas.getContext('2d')
+    if (!context) {
+      reject(new Error('Canvas indisponível'))
+      return
+    }
+
+    context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, targetWidth, targetHeight)
+    resolve(canvas.toDataURL('image/png'))
+  }
+  image.onerror = () => reject(new Error('Não foi possível carregar a imagem'))
+  image.src = url
+})
 
 const getOrCreateInput = (kind: 'image' | 'video', multiple = false) => {
   const current = kind === 'image' ? imageInput : videoInput
@@ -85,23 +178,56 @@ const renderCropModal = () => {
   const file = complexFieldState.pendingCrop
   if (!file) return
 
+  ensureCropStyles()
   const root = ensureModalRoot()
+  const safeName = escapeAttr(file.name)
+  const safeUrl = escapeAttr(file.url)
   root.innerHTML = `
-    <div class="fixed bottom-0 z-50 inset-x-0 px-4 pb-4 sm:inset-0 sm:flex sm:items-center sm:justify-center" data-complex-backdrop>
-      <div class="fixed inset-0 transition-opacity"><div class="absolute inset-0 bg-gray-500 opacity-75"></div></div>
-      <div role="dialog" aria-modal="true" aria-labelledby="modal-headline" class="bg-white overflow-hidden rounded-lg shadow-xl transform transition-all sm:w-full sm:max-w-lg">
-        <div class="bg-white px-4 pt-5 pb-4 sm:p-6">
-          <div class="mt-3 sm:mt-0 sm:text-left">
-            <h3 id="modal-headline" class="text-lg leading-6 font-medium text-gray-900">Recortar imagem</h3>
-            <div class="mt-4 bg-gray-100 rounded-md overflow-hidden flex justify-center" style="max-height: 360px;">
-              <img src="${file.url}" alt="${file.name}" class="max-w-full object-contain" data-crop-preview>
+    <div data-v-7905396a="" class="fixed bottom-0 inset-x-0 sm:inset-0 sm:flex sm:items-center sm:justify-center px-4 py-4" style="z-index: 5000;" data-complex-backdrop>
+      <div data-v-7905396a="" class="fixed inset-0 transition-opacity"><div data-v-7905396a="" class="absolute inset-0 bg-gray-500 opacity-75"></div></div>
+      <div data-v-7905396a="" role="dialog" aria-modal="true" aria-labelledby="modal-headline" class="sm:max-w-3xl max-h-[95vh] rounded-lg shadow-xl overflow-x-hidden overflow-y-auto transform transition-all sm:w-full">
+        <div data-v-7905396a="" class="bg-white px-4 pt-5 pb-4 sm:p-6">
+          <div data-v-7905396a="">
+            <div data-v-7905396a="" class="mt-3 sm:mt-0 sm:ml-4 sm:text-left">
+              <header data-v-7905396a="" class="flex justify-between">
+                <h3 data-v-7905396a="" id="modal-headline" class="text-lg leading-6 font-medium text-gray-900">Recortar &amp; Gerenciar</h3>
+              </header>
+              <div data-v-7905396a="" class="mt-2">
+                <div>
+                  <div class="cropper-container cropper-bg kiwify-cropper-stage">
+                    <img src="${safeUrl}" alt="${safeName}" class="kiwify-cropper-image">
+                    <div class="cropper-crop-box kiwify-cropper-crop-box">
+                      <span class="cropper-view-box"><img src="${safeUrl}" alt="${safeName}"></span>
+                      <span class="cropper-dashed dashed-h"></span>
+                      <span class="cropper-dashed dashed-v"></span>
+                      <span class="cropper-center"></span>
+                      <span class="cropper-face cropper-move"></span>
+                      <span class="cropper-line line-e"></span>
+                      <span class="cropper-line line-n"></span>
+                      <span class="cropper-line line-w"></span>
+                      <span class="cropper-line line-s"></span>
+                      <span class="cropper-point point-e"></span>
+                      <span class="cropper-point point-n"></span>
+                      <span class="cropper-point point-w"></span>
+                      <span class="cropper-point point-s"></span>
+                      <span class="cropper-point point-ne"></span>
+                      <span class="cropper-point point-nw"></span>
+                      <span class="cropper-point point-sw"></span>
+                      <span class="cropper-point point-se"></span>
+                    </div>
+                  </div>
+                  <div class="flex h-full flex-col w-full absolute top-0 py-10" style="display: none;">
+                    <div class="bg-gray-500 mt-1 h-80 w-full mb-4 skeleton-box"></div>
+                    <div class="flex items-center justify-between border-gray-200"><div class="flex-1"><div class="bg-gray-500 mt-1 h-12 w-full skeleton-box"></div></div></div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <p class="mt-3 text-sm leading-5 text-gray-500">Recorte mockado. A imagem será aplicada ao confirmar.</p>
           </div>
         </div>
         <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-          <span class="flex w-full rounded-md shadow-sm sm:ml-3 sm:w-auto"><button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 border-transparent focus:border-indigo-700 focus:shadow-outline-indigo leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm" data-crop-confirm>Confirmar recorte</button></span>
-          <span class="mt-3 flex w-full rounded-md shadow-sm sm:mt-0 sm:w-auto"><button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-700 hover:text-gray-500 active:text-gray-800 bg-white active:bg-gray-50 border-gray-300 focus:border-blue-300 focus:shadow-outline-blue leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm" data-complex-close>Cancelar</button></span>
+          <span data-v-7905396a="" class="flex w-full rounded-md shadow-sm sm:ml-3 sm:w-auto"><button data-v-7905396a="" type="button" class="cursor-pointer inline-flex justify-center w-full rounded-md border border-transparent px-4 py-2 text-base leading-6 font-medium text-white shadow-sm focus:outline-none focus:border-red-700 transition ease-in-out duration-150 sm:text-sm sm:leading-5 bg-indigo-600 hover:bg-indigo-500 focus:shadow-outline-indigo" data-crop-confirm>Salvar corte</button></span>
+          <span data-v-7905396a="" class="mt-3 flex w-full rounded-md shadow-sm sm:mt-0 sm:w-auto"><button data-v-7905396a="" type="button" class="cursor-pointer inline-flex justify-center w-full rounded-md border border-gray-300 px-4 py-2 bg-white text-base leading-6 font-medium text-gray-700 shadow-sm hover:text-gray-500 focus:outline-none focus:border-blue-300 focus:shadow-outline-blue transition ease-in-out duration-150 sm:text-sm sm:leading-5" data-complex-close>Cancelar</button></span>
         </div>
       </div>
     </div>
@@ -160,12 +286,18 @@ const applyImageToSurface = (key: string, url: string) => {
   }
 }
 
-const handleFiles = (files: FileList | null, kind: 'image' | 'video', multiple = false) => {
+const resolveImageTargetKey = (target?: HTMLInputElement | null) => {
+  const fieldKey = target?.name || target?.id || ''
+  if (fieldKey) return fieldKey
+  return currentImageTargetKey()
+}
+
+const handleFiles = (files: FileList | null, kind: 'image' | 'video', multiple = false, target?: HTMLInputElement | null) => {
   const file = files?.[0]
   if (!file) return
 
   const url = makeObjectUrl(file)
-  const key = kind === 'image' ? currentImageTargetKey() : 'video-upload'
+  const key = kind === 'image' ? resolveImageTargetKey(target) : 'video-upload'
 
   if (kind === 'image') {
     complexFieldState.pendingCrop = { key, name: file.name, url, kind, file }
@@ -327,8 +459,16 @@ export function useComplexFieldMocks() {
     if (target.closest('[data-crop-confirm]')) {
       const file = complexFieldState.pendingCrop
       if (file) {
+        const croppedUrl = await cropImageToDataUrl(file.url).catch(() => file.url)
         if (file.file) complexFieldState.fileObjects[file.key] = file.file
-        applyImageToSurface(file.key, file.url)
+        applyImageToSurface(file.key, croppedUrl)
+        window.dispatchEvent(new CustomEvent('kiwify:crop-complete', {
+          detail: {
+            key: file.key,
+            name: file.name,
+            url: croppedUrl
+          }
+        }))
         if (file.key === 'members-cover' && file.file && route.params.id) {
           const extension = file.file.name.split('.').pop() || 'png'
           const uploaded = await uploadFile('member-area-covers', `${String(route.params.id)}/clean-cover.${extension}`, file.file)
@@ -415,7 +555,7 @@ export function useComplexFieldMocks() {
 
     if (target instanceof HTMLInputElement && target.type === 'file') {
       const kind = target.accept.includes('video') ? 'video' : 'image'
-      handleFiles(target.files, kind)
+      handleFiles(target.files, kind, target.multiple, target)
       return
     }
 

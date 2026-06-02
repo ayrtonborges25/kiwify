@@ -1,14 +1,19 @@
 <script setup lang="ts">
+import { signOut } from '~/services/authService'
+import { setLastContext } from '~/services/sessionContextService'
+
 useHead({ title: 'Dashboard' })
 useLegacyKiwifyInteractions()
 const { currentUser } = useCurrentUser()
 const { products } = useProducts()
 const { revenueSales, levelLabel, levelProgress } = useRevenueGoal()
 
-const kiwifyLogo = computed(() => currentUser.value.branding.kiwifyLogo)
+const kiwifyLogo = '/img/kiwify-green-logo.3059fc8.svg'
 const bronzeMedal = computed(() => currentUser.value.level.medalIcon)
 const avatarUrl = computed(() => currentUser.value.avatarUrl)
+const avatarInitial = computed(() => (currentUser.value.company || currentUser.value.name || 'U').slice(0, 1).toUpperCase())
 const companyName = computed(() => currentUser.value.company)
+const avatarMenuOpen = ref(false)
 const openFilter = ref<string | null>(null)
 const selectedPeriod = ref('Hoje')
 const selectedProduct = ref('Todos os produtos')
@@ -64,10 +69,32 @@ const closeDashboardFilters = () => {
   openFilter.value = null
 }
 
+const closeAvatarMenu = () => {
+  avatarMenuOpen.value = false
+}
+
+const switchToCourses = async () => {
+  closeAvatarMenu()
+  setLastContext('student')
+  await navigateTo('/courses')
+}
+
+const logout = async () => {
+  closeAvatarMenu()
+  await signOut()
+  await navigateTo('/login')
+}
+
 onMounted(() => {
-  document.addEventListener('click', closeDashboardFilters)
+  document.addEventListener('click', () => {
+    closeDashboardFilters()
+    closeAvatarMenu()
+  })
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') closeDashboardFilters()
+    if (event.key === 'Escape') {
+      closeDashboardFilters()
+      closeAvatarMenu()
+    }
   })
 })
 
@@ -211,7 +238,7 @@ const metricsRight = computed(() => [
                   <span class="rounded-md shadow-sm">
                     <button type="button" aria-haspopup="true" aria-expanded="true" class="px-2 w-full rounded-md focus:outline-none text-white leading-5 font-medium transition ease-in-out duration-150 hover:bg-green-500">
                       <div class="flex flex-shrink-0 items-center w-full py-2">
-                        <img :src="kiwifyLogo" alt="Workflow" class="h-10 w-auto mr-2">
+                        <img :src="kiwifyLogo" alt="" class="h-10 w-auto mr-2">
                         <div class="truncate w-36">{{ companyName }}</div>
                         <svg viewBox="0 0 20 20" fill="currentColor" class="h-5 ml-2 block"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
                       </div>
@@ -266,10 +293,22 @@ const metricsRight = computed(() => [
                 </div>
               </div>
             </div>
-            <div class="flex items-center md:mr-6">
-              <span class="inline-block rounded-full overflow-hidden bg-gray-100 h-10 w-10">
-                <img :src="avatarUrl" class="object-cover h-10 w-10">
-              </span>
+            <div class="flex items-center md:mr-6 relative">
+              <button type="button" class="inline-block rounded-full overflow-hidden bg-gray-100 h-10 w-10 cursor-pointer focus:outline-none" :aria-expanded="avatarMenuOpen" @click.stop="avatarMenuOpen = !avatarMenuOpen">
+                <img v-if="avatarUrl" :src="avatarUrl" class="object-cover h-10 w-10">
+                <span v-else class="object-cover h-10 w-10 flex items-center justify-center text-sm leading-5 font-medium text-gray-700">{{ avatarInitial }}</span>
+              </button>
+              <div v-if="avatarMenuOpen" class="dropdown z-50" style="display: block; position: absolute; right: 0px; top: 48px;" @click.stop>
+                <div class="min-w-scale z-50 rounded-md shadow-lg" style="display: block; min-width: 14rem;">
+                  <div class="rounded-md bg-white shadow-xs">
+                    <div class="py-1 cursor-pointer">
+                      <button type="button" role="menuitem" class="group flex cursor-pointer items-center px-4 py-2 gap-x-3 text-sm leading-5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:bg-gray-100 focus:text-gray-900 w-full text-left" @click="switchToCourses">Mudar para meus cursos</button>
+                      <NuxtLink to="/myprofile" role="menuitem" class="group flex cursor-pointer items-center px-4 py-2 gap-x-3 text-sm leading-5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:bg-gray-100 focus:text-gray-900" @click="closeAvatarMenu">Meu perfil</NuxtLink>
+                      <button type="button" role="menuitem" class="group flex cursor-pointer items-center px-4 py-2 gap-x-3 text-sm leading-5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:bg-gray-100 focus:text-gray-900 w-full text-left" @click="logout">Sair</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

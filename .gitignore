@@ -1,9 +1,24 @@
 .env
 .env.*
 !.env.example
+supabase/.env
+supabase/.env.*
 
 node_modules
 .nuxt
 .output
 .DS_Store
 .vercel
+
+tmp/
+private/
+*.local.json
+*.secret.json
+*.secrets.json
+*secret*.json
+*credential*.json
+*credentials*.json
+*session*.json
+*token*.json
+*auth2*.json
+*.dump.json

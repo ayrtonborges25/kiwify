@@ -389,6 +389,81 @@ supabase secrets set RESEND_API_KEY=... RESEND_FROM_EMAIL=noreply@ayrtonborgeson
 supabase functions deploy asaas-webhook --project-ref fndefvxkhvhdkcfeubzf
 ```
 
+### Auth e acesso a area de membros
+
+Migration:
+
+- `supabase/migrations/20260602130000_auth_profiles_access.sql`
+
+Responsabilidades:
+
+- `middleware/auth.global.ts`: resolve sessao e protege apenas rotas administrativas e paginas de login/cadastro.
+- `middleware/club-access.ts`: protege `/club={clubId}` validando entrega ativa, venda aprovada e acesso ao club.
+- `services/authService.ts`: centraliza `signUp`, `signIn`, `signOut`, profile e validacao de acesso do aluno.
+
+Fluxo admin:
+
+- Visitante em `/dashboard` ou rotas administrativas e redirecionado para `/login?redirect=...`.
+- Admin autenticado com `profiles.role = 'admin'` acessa `/dashboard`, `/products`, `/sales`, `/members-area` e demais rotas do painel.
+- Student autenticado tentando abrir rota administrativa e bloqueado e redirecionado para area de login/entrada de aluno.
+
+Fluxo aluno:
+
+- Link de entrega usa `/club={clubId}`.
+- Visitante em `/club={clubId}` e redirecionado para `/student/login?clubId={clubId}&redirect=/club={clubId}`.
+- Cadastro de aluno deve usar o mesmo e-mail da compra.
+- Acesso e liberado quando existe `product_deliveries.status = 'active'` e venda relacionada com status aprovado.
+- A validacao atual aceita `customer_email = auth.email` e tambem ja esta preparada para `sales.user_id` e `product_deliveries.user_id`.
+- Aluno sem entrega ativa/aprovada ve `Acesso negado`.
+
+Como promover usuario para admin:
+
+```sql
+update public.profiles
+set role = 'admin', updated_at = now()
+where email = 'email-do-admin@dominio.com';
+```
+
+Checks obrigatorios no banco:
+
+- `profiles.id` deve ser FK para `auth.users.id`.
+- `profiles.role` deve ter check `role in ('admin', 'student')`.
+- `sales.user_id` deve existir.
+- `product_deliveries.user_id` deve existir.
+- RLS deve estar ativo em `profiles`, `sales` e `product_deliveries`.
+
+Policies principais:
+
+- `profiles own read`, `profiles own update`, `profiles own insert`.
+- `profiles admin read`, `profiles admin write`.
+- `sales student read own`, `sales admin read`, `sales admin write`, `clone checkout public sale insert`.
+- `deliveries student read own`, `deliveries admin read`, `deliveries admin write`.
+
+Config remota de Auth:
+
+- Para o fluxo "comprou sem criar conta -> criou conta com mesmo e-mail -> entrou direto no club", o Supabase remoto precisa permitir autoconfirmacao de e-mail (`mailer_autoconfirm = true`).
+
+### Recuperacao de senha por codigo
+
+Migration:
+
+- `supabase/migrations/20260602152000_password_reset_codes.sql`
+
+Fluxo:
+
+- O usuario acessa `/forgot-password`.
+- A rota `POST /api/auth/password-reset/request` recebe o e-mail.
+- Se existir `profiles.email`, o servidor gera um codigo de 6 digitos, salva apenas o hash em `password_reset_codes` e envia o codigo por Resend.
+- A rota sempre responde genericamente para nao revelar se o e-mail existe.
+- A rota `POST /api/auth/password-reset/confirm` valida e consome o codigo, entao troca a senha via Supabase Admin API.
+
+Regras:
+
+- Codigo expira em 15 minutos.
+- Codigos anteriores do mesmo e-mail sao consumidos quando um novo e gerado.
+- Cada codigo aceita no maximo 5 tentativas.
+- O codigo nao e salvo em claro no banco.
+
 ### Como rodar o SQL
 
 1. Abra o projeto no Supabase.

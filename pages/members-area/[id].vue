@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { MembersAreaLesson, MembersAreaLessonAttachment, MembersAreaModule } from '~/data/membersArea'
+import { defaultFigurinhasModuleImage } from '~/data/memberClub'
 import { uploadFile } from '~/utils/supabase'
 
 useHead({ title: 'Área de Membros Produto' })
@@ -36,6 +37,7 @@ const students = ref<any[]>([])
 const groups = ref<any[]>([])
 const membersDataLoading = ref(false)
 const settingsSaving = ref(false)
+const moduleImageUploading = ref(false)
 const groupDraft = ref('')
 const openModuleMenuId = ref('')
 const showModuleModal = ref(false)
@@ -73,6 +75,7 @@ const publicClubPath = computed(() => `/club=${membersAreaId.value}`)
 const editorPath = computed(() => `/members-area/${membersAreaId.value}/editor`)
 const activeCourseId = computed(() => courseId.value || selectedCourse.value?.id || defaultCourseId.value)
 const selectedModule = computed(() => courseModules.value.find((module) => module.id === moduleDraft.id))
+const modulePreviewImage = computed(() => moduleDraft.imageUrl)
 
 const tabs = [
   { key: 'courses', label: 'Cursos', icon: 'M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z' },
@@ -138,10 +141,44 @@ const openEditModuleModal = (module: MembersAreaModule) => {
   Object.assign(moduleDraft, {
     id: module.id || '',
     title: module.title,
-    imageUrl: module.imageUrl || ''
+    imageUrl: module.imageUrl === defaultFigurinhasModuleImage ? '' : (module.imageUrl || '')
   })
   showModuleModal.value = true
   openModuleMenuId.value = ''
+}
+
+const fileToDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+  const reader = new FileReader()
+  reader.onload = () => resolve(String(reader.result || ''))
+  reader.onerror = () => reject(reader.error)
+  reader.readAsDataURL(file)
+})
+
+const handleModuleImageUpload = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  moduleImageUploading.value = true
+  try {
+    const safeName = file.name.replace(/[^\w.-]+/g, '-')
+    const path = `modules/${activeCourseId.value}/${moduleDraft.id || 'new'}-${Date.now()}-${safeName}`
+    const { data, error } = await uploadFile('member-area-covers', path, file)
+    moduleDraft.imageUrl = !error && data?.publicUrl ? data.publicUrl : await fileToDataUrl(file)
+  } finally {
+    moduleImageUploading.value = false
+    input.value = ''
+  }
+}
+
+const handleModuleCropComplete = (event: Event) => {
+  const detail = (event as CustomEvent<{ key?: string; url?: string }>).detail
+  if (!detail?.url) return
+
+  const key = detail.key || ''
+  if (key === 'moduleimageupload' || key === 'module-image-upload') {
+    moduleDraft.imageUrl = detail.url
+  }
 }
 
 const saveModuleDraft = async () => {
@@ -353,25 +390,30 @@ const saveSettings = async () => {
 watch(membersAreaId, loadMembersAreaData)
 watch(courseId, reloadCourseModules)
 
-onMounted(loadMembersAreaData)
+onMounted(() => {
+  loadMembersAreaData()
+  window.addEventListener('kiwify:crop-complete', handleModuleCropComplete)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('kiwify:crop-complete', handleModuleCropComplete)
+})
 </script>
 
 <template>
   <NuxtPage v-if="route.name === 'members-area-id-editor'" />
   <KiwifyChrome v-else :hide-topbar="isEditingContent">
     <div class="container mx-auto px-4 sm:px-8 py-8 lg:py-10 lg:px-20">
-      <div v-if="!isEditingContent" class="page-header mb-8" style="height: 42px;">
-        <div class="flex items-center">
-          <button type="button" class="mr-4 text-gray-900 focus:outline-none cursor-pointer" @click="goBack">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-8 w-8"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-          </button>
-          <h3 class="page-title">{{ areaName }}</h3>
-        </div>
+      <header v-if="!isEditingContent" class="w-full flex flex-row gap-4 items-center justify-items-stretch page-header mb-8">
+        <button type="button" class="p-1.5 -m-1.5 rounded-md cursor-pointer bg-transparent outline-none focus:outline-none transition-all ease-in-out duration-200 focus:bg-gray-200 hover:bg-gray-200" title="Voltar" @click="goBack">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="24px" height="24px" class="w-6 h-6"><path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd"></path></svg>
+        </button>
+        <h3 class="font-bold leading-6 text-2xl text-gray-900 flex flex-col flex-1">{{ areaName }}</h3>
         <NuxtLink :to="publicClubPath" target="_blank" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-700 hover:text-gray-500 active:text-gray-800 bg-white active:bg-gray-50 border-gray-300 focus:border-blue-300 focus:shadow-outline-blue leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="24px" height="24px" class="h-5 w-5"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"></path><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"></path></svg>
-          Pré-visualizar
+          <div class="hidden md:block">Pré-visualizar</div>
         </NuxtLink>
-      </div>
+      </header>
 
       <div v-if="!isEditingContent" class="w-full bg-gray-50 rounded-lg shadow">
         <div class="md:hidden">
@@ -781,20 +823,34 @@ onMounted(loadMembersAreaData)
       </template>
 
       <template v-else>
-        <div class="mt-10 flex justify-between items-center">
-          <h3 class="text-2xl leading-6 font-bold text-gray-900">{{ selectedCourse?.title || areaName }}</h3>
-          <div class="flex items-center">
-            <button type="button" class="mr-2 inline-flex justify-center rounded-md border border-gray-300 p-3 bg-white text-gray-700 shadow-sm">
+        <div class="mt-8 md:px-10">
+        <div class="page-header flex-wrap gap-4 xl:flex-no-wrap">
+          <div class="page-title truncate py-1">{{ selectedCourse?.title || areaName }}</div>
+          <div class="flex items-center flex-wrap gap-3 xl:min-w-max-content">
+            <button type="button" class="inline-flex items-center justify-center p-2.5 cursor-pointer border border-gray-300 text-sm leading-5 font-medium rounded-md text-gray-700 bg-white hover:text-gray-500 focus:outline-none focus:border-blue-300 focus:shadow-outline-blue active:text-gray-800 active:bg-gray-50 transition ease-in-out duration-150">
               <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20" width="24px" height="24px" class="h-5 w-5"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"></path></svg>
             </button>
-            <button type="button" class="mr-2 inline-flex justify-center rounded-md border border-gray-300 p-3 bg-white text-gray-700 shadow-sm">
-              <svg fill="currentColor" viewBox="0 0 20 20" class="h-5 w-5"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>
-            </button>
-            <button type="button" data-disable-mock-upload class="mr-2 inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-700 hover:text-gray-500 active:text-gray-800 bg-white active:bg-gray-50 border-gray-300 focus:border-blue-300 focus:shadow-outline-blue leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm" @click.stop="handleToolbarUploadClick">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24px" height="24px" class="h-5 w-5"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M12 12v9m0-9l-3 3m3-3l3 3"></path></svg>
+            <div class="inline-flex rounded-md font-normal">
+              <div class="relative inline-block">
+                <span class="rounded-md block shadow-sm relative dropdown-trigger">
+                  <span id="options-menu" class="focus:outline-none">
+                    <button disabled="disabled" class="inline-flex items-center justify-center p-2.5 cursor-pointer border border-gray-300 text-sm leading-5 font-medium rounded-md text-gray-700 bg-white hover:text-gray-500 focus:outline-none focus:border-blue-300 focus:shadow-outline-blue active:text-gray-800 active:bg-gray-50 transition ease-in-out duration-150 opacity-50 cursor-not-allowed">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="24px" height="24px" class="h-5 w-5 text-black"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>
+                    </button>
+                  </span>
+                </span>
+              </div>
+            </div>
+            <button type="button" data-disable-mock-upload class="inline-flex items-center px-4 py-2 cursor-pointer border border-gray-300 text-sm leading-6 font-medium rounded-md text-gray-700 bg-white hover:text-gray-500 focus:outline-none focus:border-blue-300 focus:shadow-outline-blue active:text-gray-800 active:bg-gray-50 transition ease-in-out duration-150" @click.stop="handleToolbarUploadClick">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="24px" height="24px" class="-ml-1 mr-3 h-5 w-5 text-black"><path d="M5.5 13a3.5 3.5 0 01-.369-6.98 4 4 0 117.753-1.977A4.5 4.5 0 1113.5 13H11V9.413l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13H5.5z"></path><path d="M9 13h2v5a1 1 0 11-2 0v-5z"></path></svg>
               Upload de vídeos
             </button>
-            <button type="button" class="mr-2 inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-700 hover:text-gray-500 active:text-gray-800 bg-white active:bg-gray-50 border-gray-300 focus:border-blue-300 focus:shadow-outline-blue leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm">Minimizar</button>
+            <span class="inline-flex rounded-md shadow-sm">
+              <button class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm leading-6 font-medium rounded-md text-gray-700 bg-white hover:text-gray-500 focus:outline-none focus:border-blue-300 focus:shadow-outline-blue active:text-gray-800 active:bg-gray-50 transition ease-in-out duration-150">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="-ml-1 mr-3 h-5 w-5 text-black"><title>Contract</title> <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M304 416V304h112M314.2 314.23L432 432M208 96v112H96M197.8 197.77L80 80M416 208H304V96M314.23 197.8L432 80M96 304h112v112M197.77 314.2L80 432"></path></svg>
+                Minimizar
+              </button>
+            </span>
             <div class="relative">
               <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 border-transparent focus:border-indigo-700 focus:shadow-outline-indigo leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm" @click.stop="showAddMenu = !showAddMenu">Adicionar</button>
               <div v-if="showAddMenu" class="absolute z-30 w-56 bg-white rounded-md shadow-lg border border-gray-100 py-2" style="right: 0; top: 48px;">
@@ -805,8 +861,8 @@ onMounted(loadMembersAreaData)
           </div>
         </div>
 
-        <div class="mt-10 space-y-8">
-          <section v-for="module in courseModules" :key="module.id" class="bg-white rounded-lg shadow overflow-visible">
+        <div class="mt-8 space-y-8">
+          <section v-for="module in courseModules" :key="module.id" class="bg-white rounded-lg shadow overflow-visible relative">
             <div class="flex items-center px-6 py-5 relative">
               <span class="text-gray-400 mr-6">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20" class="h-5 w-5"><path d="M7 4a1 1 0 100 2 1 1 0 000-2zM7 9a1 1 0 100 2 1 1 0 000-2zM7 14a1 1 0 100 2 1 1 0 000-2zM13 4a1 1 0 100 2 1 1 0 000-2zM13 9a1 1 0 100 2 1 1 0 000-2zM13 14a1 1 0 100 2 1 1 0 000-2z"></path></svg>
@@ -828,7 +884,7 @@ onMounted(loadMembersAreaData)
                 </button>
               </div>
             </div>
-            <button type="button" class="-mt-4 ml-5 mb-3 h-12 w-12 rounded-full border border-gray-300 bg-white shadow flex items-center justify-center text-gray-400" @click.stop="startCreateLesson(module.id)">
+            <button type="button" class="absolute left-5 top-16 h-12 w-12 rounded-full border border-gray-300 bg-white shadow flex items-center justify-center text-gray-400 z-10" @click.stop="startCreateLesson(module.id)">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-6 w-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
             </button>
             <div class="bg-gray-50 text-center py-4 text-gray-500">
@@ -856,6 +912,7 @@ onMounted(loadMembersAreaData)
             <p class="text-gray-500">Nenhum módulo criado ainda.</p>
             <button type="button" class="mt-4 inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-white bg-indigo-600 hover:bg-indigo-500 border-transparent leading-5 text-sm px-4 py-2" @click="openCreateModuleModal">Criar módulo</button>
           </section>
+        </div>
         </div>
 
         <div class="py-8 flex justify-center text-gray-900">
@@ -891,16 +948,16 @@ onMounted(loadMembersAreaData)
                   <label class="label mb-1">Imagem</label>
                   <div>
                     <label for="module-image-upload" id="moduleimageupload" class="hover:bg-gray-50 cursor-pointer flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 transition duration-300 border-dashed rounded-md h-48 items-center max-w-lg">
-                      <div v-if="moduleDraft.imageUrl || coverUrl" class="relative w-full h-full">
-                        <img :src="moduleDraft.imageUrl || coverUrl" alt="" class="w-full h-full object-cover">
-                        <button type="button" class="absolute inset-0 m-auto h-12 w-12 rounded-full bg-black bg-opacity-60 text-white text-3xl" @click.prevent="moduleDraft.imageUrl = coverUrl">+</button>
+                      <input id="module-image-upload" accept="image/jpeg,image/jpg,image/png" name="moduleimageupload" type="file" class="sr-only" @change="handleModuleImageUpload">
+                      <div v-if="moduleDraft.imageUrl" class="relative w-full h-full">
+                        <img :src="moduleDraft.imageUrl" alt="" class="w-full h-full object-cover">
+                        <button type="button" class="absolute inset-0 m-auto h-12 w-12 rounded-full bg-black bg-opacity-60 text-white text-3xl" @click.prevent="moduleDraft.imageUrl = ''">+</button>
                       </div>
                       <div v-else class="space-y-1 text-center">
                         <svg stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true" class="mx-auto h-12 w-12 text-gray-400"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
                         <div class="flex flex-col text-sm text-gray-600">
                           <div class="relative cursor-pointe rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500">
-                            <span>Selecione do computador</span>
-                            <input id="module-image-upload" accept="image/jpeg,image/jpg,image/png" name="moduleimageupload" type="file" class="sr-only">
+                            <span>{{ moduleImageUploading ? 'Enviando...' : 'Selecione do computador' }}</span>
                           </div>
                           <p class="pl-1">ou arraste aqui</p>
                         </div>
@@ -934,7 +991,7 @@ onMounted(loadMembersAreaData)
                 <dt class="text-sm font-medium text-gray-500">Pré-visualização</dt>
                 <dd class="mt-1 border p-4 bg-black text-gray-600 w-full">
                   <div class="bg-black relative w-full shadow-lg rounded-md" style="padding-bottom: 136%;">
-                    <img :src="moduleDraft.imageUrl || coverUrl || '/_nuxt/img/module_preview.420776f.png'" alt="" class="absolute w-full select-none pointer-events-none">
+                    <img v-if="modulePreviewImage" :src="modulePreviewImage" alt="" class="absolute w-full select-none pointer-events-none">
                     <div class="flex justify-end w-full">
                       <div class="bg-gray-800 mr-4 text-sm font-medium bg-opacity-75 rounded-md mt-4 text-white px-6 py-1 relative z-10">
                         {{ selectedModule?.contents?.length || 0 }} Aulas

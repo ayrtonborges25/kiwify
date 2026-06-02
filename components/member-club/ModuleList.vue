@@ -77,10 +77,42 @@ const safeModuleImage = (src?: string) => {
 </template>
 
 <style scoped>
+.content-section--modules {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+
+.content-section--modules .kiwi-section__title {
+  margin-bottom: .25rem;
+}
+
+.content-section--modules .embla__container > * {
+  flex-grow: 0;
+  flex-shrink: 0;
+  flex-basis: auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .club-module-card-empty {
   width: 100%;
   aspect-ratio: 400 / 600;
   border-radius: 8px;
   background: #fff;
+}
+
+@media (min-width: 640px) {
+  .content-section--modules .kiwi-section__title {
+    margin-bottom: .75rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .content-section--modules {
+    padding-left: 3rem;
+    padding-right: 3rem;
+    padding-bottom: 3rem;
+  }
 }
 </style>

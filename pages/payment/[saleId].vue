@@ -44,12 +44,8 @@ const pixQrImageSrc = computed(() => {
 
 const accessUrl = computed(() => {
   if (approvedAccessUrl.value) return approvedAccessUrl.value
-  if (delivery.value?.accessUrl) return delivery.value.accessUrl
-
-  const productId = delivery.value?.productId || sale.value?.productId
-  if (productId) return `/club=${productId}`
-
-  return '/'
+  if (delivery.value?.accessUrl || sale.value?.productId) return '/courses'
+  return '/courses'
 })
 
 const redirectIfApproved = async () => {
@@ -126,7 +122,7 @@ onBeforeUnmount(() => {
       <div v-if="isBoleto" class="boleto-status-note">Status pendente</div>
       <a v-if="sale?.boletoUrl" :href="sale.boletoUrl" target="_blank" rel="noreferrer" class="payment-status-link secondary">Abrir boleto</a>
       <a v-else-if="sale?.invoiceUrl && !sale?.pixCopyPaste" :href="sale.invoiceUrl" target="_blank" rel="noreferrer" class="payment-status-link secondary">Abrir fatura</a>
-      <NuxtLink v-if="isApproved" :to="accessUrl" class="payment-status-link">Acessar produto</NuxtLink>
+      <NuxtLink v-if="isApproved" :to="accessUrl" class="payment-status-link">Meus cursos</NuxtLink>
     </section>
   </main>
 </template>

@@ -36,6 +36,7 @@ const slides = computed(() => home.value.slides || [])
 const sections = computed(() => home.value.sections || [])
 const route = useRoute()
 const isEditorPreview = computed(() => route.query.editor === '1')
+const sidebarCollapsed = ref(false)
 const safeClubImage = (src?: string) => {
   const value = String(src || '')
   if (/^(data:image|blob:)/i.test(value) || /member-area-covers.*clean-/i.test(value)) return value
@@ -44,9 +45,15 @@ const safeClubImage = (src?: string) => {
 const showBanner = computed(() => banner.value.visible !== false && (!customization.value.visibleSections || customization.value.visibleSections.includes('banner')))
 const visibleSections = computed(() => sections.value.filter((section: any) => section.visible !== false))
 const heroImage = computed(() => safeClubImage(banner.value.imageUrl || slides.value[0]?.imageUrl || props.data?.course.coverUrl))
+watch(() => Boolean(sidebar.value.collapsed), (collapsed) => {
+  sidebarCollapsed.value = collapsed
+}, { immediate: true })
 
 const activeModule = ref<MemberClubModule>()
 const activeLesson = ref<MemberClubLesson>()
+const toggleSidebar = () => {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
 const openModule = (module: MemberClubModule) => {
   if (isEditorPreview.value) return
   activeModule.value = module
@@ -69,9 +76,9 @@ const lessonDescriptionParts = computed(() => {
 
 <template>
   <main class="club-page" :class="{ 'club-page--editor-preview': isEditorPreview, 'club-page--lesson-open': activeLesson }" :style="{ backgroundColor: theme.backgroundColor || customization.backgroundColor || '#080808', color: theme.textColor || customization.textColor || '#ffffff' }">
-    <ClubSidebar v-if="!activeLesson" :club="data?.club" :progress="progress" :editor-preview="isEditorPreview" />
+    <ClubSidebar v-if="!activeLesson" :club="data?.club" :progress="progress" :editor-preview="isEditorPreview" :collapsed="sidebarCollapsed" @toggle="toggleSidebar" />
 
-    <section class="club-page__content" :class="{ 'club-page__content--collapsed': sidebar.collapsed, 'club-page__content--lesson': activeLesson }">
+    <section class="club-page__content" :class="{ 'club-page__content--collapsed': sidebarCollapsed, 'club-page__content--lesson': activeLesson }">
       <div v-if="loading" class="club-page__state">Carregando...</div>
       <div v-else-if="error" class="club-page__state">{{ error }}</div>
       <section v-else-if="activeLesson" class="club-lesson-view">
@@ -238,12 +245,19 @@ const lessonDescriptionParts = computed(() => {
 
 .club-banner-empty {
   width: 100%;
-  aspect-ratio: 2000 / 590;
+  aspect-ratio: 768 / 432;
   background: #fff;
 }
 
+.club-editable-section--banner img,
+.club-editable-section--banner .club-banner-empty {
+  width: 100%;
+  aspect-ratio: 768 / 432;
+  object-fit: cover;
+}
+
 .club-page__content--collapsed {
-  margin-left: 86px !important;
+  margin-left: 88px !important;
 }
 
 .club-page__content--lesson {
@@ -258,6 +272,24 @@ const lessonDescriptionParts = computed(() => {
 .club-page__section {
   position: relative;
   margin-bottom: 42px;
+}
+
+.content-section {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+
+.content-section .kiwi-section__title {
+  margin-bottom: .25rem;
+}
+
+.content-section .embla__container > * {
+  flex-grow: 0;
+  flex-shrink: 0;
+  flex-basis: auto;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .club-page__section h2 {
@@ -313,7 +345,8 @@ const lessonDescriptionParts = computed(() => {
 }
 
 .club-lesson-view__thumb {
-  height: 76px;
+  width: 96px;
+  aspect-ratio: 16 / 9;
   border-radius: 6px;
   border-bottom: 5px solid #ef4444;
   display: flex;
@@ -324,14 +357,14 @@ const lessonDescriptionParts = computed(() => {
 }
 
 .club-lesson-view__thumb svg {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
 }
 
 .club-lesson-view {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 1fr 498px;
+  grid-template-columns: minmax(0, 3fr) minmax(320px, 1fr);
   background: #08090b;
   color: #fff;
 }
@@ -358,7 +391,7 @@ const lessonDescriptionParts = computed(() => {
 
 .club-lesson-view__toolbar {
   position: absolute;
-  top: 126px;
+  top: 96px;
   right: 48px;
   display: flex;
   align-items: center;
@@ -373,6 +406,7 @@ const lessonDescriptionParts = computed(() => {
   background: transparent;
   font-size: 42px;
   cursor: pointer;
+  line-height: 1;
 }
 
 .club-lesson-view__content {
@@ -389,24 +423,29 @@ const lessonDescriptionParts = computed(() => {
 
 .club-lesson-view__content h1 {
   margin: 0;
-  font-size: 30px;
+  font-size: 24px;
   line-height: 1.2;
   font-weight: 800;
 }
 
 .club-lesson-view__text {
-  margin-top: 126px;
+  margin-top: 108px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   color: #d7d7dc;
-  font-size: 24px;
+  font-size: 18px;
   line-height: 1.35;
 }
 
 .club-lesson-view__text a {
+  display: block;
+  max-width: 430px;
+  overflow: hidden;
   color: #facc15;
   text-decoration: underline;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .club-lesson-view__aside {
@@ -423,7 +462,8 @@ const lessonDescriptionParts = computed(() => {
 
 .club-lesson-view__aside h2 {
   margin: 0;
-  font-size: 32px;
+  font-size: 30px;
+  font-weight: 400;
 }
 
 .club-lesson-view__aside header button {
@@ -432,6 +472,7 @@ const lessonDescriptionParts = computed(() => {
   background: transparent;
   font-size: 42px;
   cursor: pointer;
+  line-height: 1;
 }
 
 .club-lesson-view__module {
@@ -440,22 +481,22 @@ const lessonDescriptionParts = computed(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 22px;
+  font-size: 16px;
 }
 
 .club-lesson-view__lesson {
   width: 100%;
-  min-height: 128px;
+  min-height: 82px;
   display: grid;
-  grid-template-columns: 20px 132px 1fr;
+  grid-template-columns: 20px 96px minmax(0, 1fr);
   align-items: center;
-  gap: 18px;
+  gap: 8px;
   border: 0;
   color: #fff;
   background: #1d1e22;
   text-align: left;
   cursor: pointer;
-  padding: 16px 24px;
+  padding: 14px 16px 14px 44px;
 }
 
 .club-lesson-view__lesson--active {
@@ -463,8 +504,8 @@ const lessonDescriptionParts = computed(() => {
 }
 
 .club-lesson-view__lesson span:last-child {
-  font-size: 22px;
-  line-height: 1.2;
+  font-size: 16px;
+  line-height: 1.25;
 }
 
 .club-page--editor-preview .club-editable-section {
@@ -558,6 +599,25 @@ const lessonDescriptionParts = computed(() => {
 
   .club-page__inner {
     padding: 28px 20px 60px;
+  }
+}
+
+@media (min-width: 640px) {
+  .club-editable-section--banner img,
+  .club-editable-section--banner .club-banner-empty {
+    aspect-ratio: 2000 / 590;
+  }
+
+  .content-section .kiwi-section__title {
+    margin-bottom: .75rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .content-section {
+    padding-left: 3rem;
+    padding-right: 3rem;
+    padding-bottom: 3rem;
   }
 }
 </style>

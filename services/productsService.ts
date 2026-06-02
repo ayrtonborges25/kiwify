@@ -1,5 +1,6 @@
 import { products as mockProducts, type Product } from '~/data/products'
 import { createCourse, createMembersArea, deleteCourseAndMaybeMembersArea } from '~/services/membersAreaService'
+import { getCurrentWorkspace } from '~/services/permissionsService'
 import { getSupabaseClient } from '~/utils/supabase'
 
 export type ProductSettingsPayload = {
@@ -424,9 +425,12 @@ export const createProduct = async (payload: CreateProductPayload = {}) => {
   try {
     const supabase = getSupabaseClient()
     if (supabase) {
-	      const { data, error } = await supabase
-	        .from('products')
-        .insert({
+      const [{ data: userData }, currentWorkspace] = await Promise.all([
+        supabase.auth.getUser(),
+        getCurrentWorkspace()
+      ])
+
+      const productPayload: Record<string, any> = {
           name: payload.name ?? 'Novo produto',
           description: payload.description ?? '',
           price: parseSupabasePrice(payload.price),
@@ -435,12 +439,45 @@ export const createProduct = async (payload: CreateProductPayload = {}) => {
           type: payload.type ?? (payload.deliveryType === 'external' ? 'Pagamento' : 'Produto digital'),
           sales: payload.sales ?? 0,
           image_url: payload.imageUrl
-	        })
+      }
+
+      if (currentWorkspace?.id) productPayload.workspace_id = currentWorkspace.id
+      if (userData.user?.id) {
+        productPayload.owner_id = userData.user.id
+        productPayload.user_id = userData.user.id
+      }
+
+	    let { data, error } = await supabase
+	      .from('products')
+        .insert(productPayload)
 	        .select('*')
 	        .single()
 
+      if (error && /workspace_id|owner_id/i.test(String(error.message || ''))) {
+        delete productPayload.workspace_id
+        delete productPayload.owner_id
+        ;({ data, error } = await supabase
+          .from('products')
+          .insert(productPayload)
+          .select('*')
+          .single())
+      }
+
 	      if (!error && data) {
 	        const product = mapProductFromSupabase(data)
+        if (userData.user?.id) {
+          try {
+            await supabase
+              .from('product_members')
+              .upsert({
+                product_id: product.id,
+                user_id: userData.user.id,
+                role: 'owner'
+              }, { onConflict: 'product_id,user_id' })
+          } catch {
+            // Compatibilidade quando a migration contextual ainda nao foi aplicada.
+          }
+        }
         try {
           await ensureProductCourseInSupabase(product, payload)
         } catch {

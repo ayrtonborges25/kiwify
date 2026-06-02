@@ -238,11 +238,16 @@ const persistThankYouSettings = () => {
   thankYouDirty.value = true
   if (thankYouPersistTimer) clearTimeout(thankYouPersistTimer)
   thankYouPersistTimer = setTimeout(async () => {
+    const currentUpsellSettings = currentProduct.value?.settings?.upsellSettings || {}
     const saved = await updateProduct(productId.value, {
       settings: {
         ...(currentProduct.value?.settings || {}),
         thankYouEnabled: thankYouEnabled.value,
-        thankYouUrl: thankYouUrl.value.trim()
+        thankYouUrl: thankYouUrl.value.trim(),
+        upsellSettings: {
+          ...currentUpsellSettings,
+          enabled: thankYouEnabled.value ? Boolean(currentUpsellSettings.enabled) : false
+        }
       }
     })
     const savedSettings = saved?.settings

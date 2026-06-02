@@ -25,8 +25,21 @@ const cleanMemberClubLessonText = (value = '') => {
   return value.replace(/https:\/\/drive\.google\.com\/drive\.\.\./g, figurinhasDriveLink)
 }
 const resolveMemberClubModuleImage = (row: Record<string, any>, title = '') => {
+  const explicitImage = cleanMemberClubImage(row.cover_url || row.image_url || '', '')
+  if (explicitImage) return explicitImage
   if (/baixar figurinhas|figurinhas/i.test(title)) return defaultFigurinhasModuleImage
-  return cleanMemberClubImage(row.cover_url || row.image_url || defaultFigurinhasModuleImage, defaultFigurinhasModuleImage) || defaultFigurinhasModuleImage
+  return defaultFigurinhasModuleImage
+}
+
+const readLocalCourseModules = (courseId: string) => {
+  if (!process.client) return []
+  try {
+    const raw = localStorage.getItem(`members-area-course:${courseId}:modules`)
+    const modules = raw ? JSON.parse(raw) : []
+    return Array.isArray(modules) ? modules : []
+  } catch {
+    return []
+  }
 }
 
 const readLocalCustomization = (id: string) => {
@@ -147,6 +160,28 @@ export const getMemberClubById = async (clubId: string): Promise<MemberClubData>
     if (!supabase) {
       const mock = getMockMemberClub(clubId)
       const customization = normalizeCustomization(readLocalCustomization(clubId), mock.club.title, mock.course.coverUrl || '')
+      const localModules = readLocalCourseModules(mock.course.id)
+      const modules = (localModules.length ? localModules : mock.modules).map((module: Record<string, any>, index: number) => {
+        const moduleId = module.id || `module-${index}`
+        const lessonRows = Array.isArray(module.contents) ? module.contents : (Array.isArray(module.lessons) ? module.lessons : [])
+        return {
+          id: moduleId,
+          title: cleanMemberClubText(module.title || `Módulo ${index + 1}`, `Módulo ${index + 1}`),
+          description: module.description || '',
+          imageUrl: cleanMemberClubImage(module.imageUrl || module.image_url || '', '') || (module.title && /baixar figurinhas|figurinhas/i.test(module.title) ? defaultFigurinhasModuleImage : ''),
+          position: Number(module.position ?? index + 1),
+          status: String(module.status || 'Publicado').toLowerCase().includes('bloque') ? 'locked' : 'available',
+          lessons: lessonRows.map((lesson: Record<string, any>, lessonIndex: number) => ({
+            id: lesson.id || `${moduleId}-lesson-${lessonIndex}`,
+            moduleId,
+            title: cleanMemberClubText(lesson.title || `Aula ${lessonIndex + 1}`, `Aula ${lessonIndex + 1}`),
+            description: cleanMemberClubLessonText(lesson.content || lesson.description || ''),
+            duration: lesson.duration || '',
+            position: Number(lesson.position || lessonIndex + 1),
+            status: String(lesson.status || 'Publicado').toLowerCase().includes('bloque') ? 'locked' : 'available'
+          }))
+        }
+      })
       return {
         ...mock,
         club: {
@@ -161,7 +196,8 @@ export const getMemberClubById = async (clubId: string): Promise<MemberClubData>
         course: {
           ...mock.course,
           coverUrl: customization.home?.banner?.imageUrl || mock.course.coverUrl
-        }
+        },
+        modules: modules.length ? modules : mock.modules
       }
     }
 

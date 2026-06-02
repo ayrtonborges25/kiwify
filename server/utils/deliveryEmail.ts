@@ -76,7 +76,7 @@ const buildDeliveryEmailHtml = ({
             <tr>
               <td align="center" style="padding:0 32px 32px;">
                 <a href="${escapeHtml(accessUrl)}" style="display:block;background:#5846f6;color:#ffffff;text-decoration:none;font-size:17px;font-weight:700;border-radius:8px;padding:16px 24px;">
-                  Acessar produto
+                  Acessar meus cursos
                 </a>
               </td>
             </tr>
@@ -114,8 +114,7 @@ export const sendProductAccessEmail = async (
     productName = product?.name || productName
   }
 
-  const fallbackAccessPath = delivery.product_id ? `/club=${delivery.product_id}` : '/'
-  const accessUrl = absoluteUrl(String(config.appUrl || 'http://localhost:3000'), delivery.access_url || fallbackAccessPath)
+  const accessUrl = absoluteUrl(String(config.appUrl || 'http://localhost:3000'), '/courses')
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -136,12 +135,10 @@ export const sendProductAccessEmail = async (
   })
 
   if (!response.ok) {
-    const body = await response.text()
     console.error('[email] Erro ao enviar acesso pelo Resend.', {
       saleId: sale.id,
       deliveryId: delivery.id,
-      status: response.status,
-      body
+      status: response.status
     })
     return false
   }

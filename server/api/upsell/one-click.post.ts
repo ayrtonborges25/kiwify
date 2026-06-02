@@ -101,6 +101,6 @@ export default defineEventHandler(async (event) => {
   return {
     saleId: sale.id,
     status: sale.status,
-    accessUrl: delivery?.access_url || (sale.product_id ? `/club=${sale.product_id}` : '/')
+    accessUrl: '/courses'
   }
 })

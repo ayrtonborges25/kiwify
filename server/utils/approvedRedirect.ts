@@ -27,6 +27,8 @@ const withSaleId = (url: string, saleId: string) => {
   return `${url}${separator}saleId=${encodeURIComponent(saleId)}`
 }
 
+const isUpsellExampleUrl = (url: string) => /(^|\/)upsell-example(?:[/?#]|$)/.test(url)
+
 export const resolveApprovedRedirect = async (
   supabase: SupabaseLike,
   sale: SaleRedirectInput,
@@ -34,10 +36,11 @@ export const resolveApprovedRedirect = async (
 ) => {
   const productId = delivery?.product_id || sale.product_id || null
   const clubUrl = delivery?.access_url || (productId ? `/club=${productId}` : '/')
+  const coursesUrl = '/courses'
 
   if (!productId) {
     return {
-      accessUrl: clubUrl,
+      accessUrl: coursesUrl,
       clubUrl,
       thankYouUrl: '',
       usesThankYou: false
@@ -46,16 +49,22 @@ export const resolveApprovedRedirect = async (
 
   const { data: settings } = await supabase
     .from('product_settings')
-    .select('thank_you_enabled, thank_you_url')
+    .select('thank_you_enabled, thank_you_url, upsell_settings')
     .eq('product_id', productId)
     .maybeSingle()
 
   const thankYouUrl = normalizeConfiguredUrl(settings?.thank_you_url)
-  const usesThankYou = Boolean(settings?.thank_you_enabled && thankYouUrl)
+  const upsellSettings = settings?.upsell_settings || {}
+  const upsellEnabled = Boolean(upsellSettings.enabled && upsellSettings.offerId)
+  const usesThankYou = Boolean(
+    settings?.thank_you_enabled &&
+    thankYouUrl &&
+    (!isUpsellExampleUrl(thankYouUrl) || upsellEnabled)
+  )
   const resolvedThankYouUrl = usesThankYou ? withSaleId(thankYouUrl, sale.id) : ''
 
   return {
-    accessUrl: usesThankYou ? resolvedThankYouUrl : clubUrl,
+    accessUrl: usesThankYou ? resolvedThankYouUrl : coursesUrl,
     clubUrl,
     thankYouUrl: resolvedThankYouUrl,
     usesThankYou
