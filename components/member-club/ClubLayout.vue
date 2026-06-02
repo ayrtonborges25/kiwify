@@ -259,9 +259,9 @@ const lessonDescriptionParts = computed(() => {
   flex: 1 1 auto;
   width: auto;
   min-width: 0;
-  max-height: calc(100svh - 3.25rem);
+  max-height: 100svh;
   min-height: 0;
-  padding-bottom: 3.25rem;
+  padding-bottom: 0;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -675,7 +675,7 @@ const lessonDescriptionParts = computed(() => {
     max-height: none;
     min-height: 0;
     margin-left: 0;
-    padding-bottom: 0;
+    padding-bottom: 3.25rem;
     overflow: visible;
   }
 
