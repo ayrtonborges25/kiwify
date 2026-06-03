@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { signIn } from '~/services/authService'
+import { requireStudentAccess, signIn } from '~/services/authService'
 import { resolvePostLoginRedirect, setLastContext } from '~/services/sessionContextService'
 
 definePageMeta({ layout: false })
@@ -12,6 +12,20 @@ const loading = ref(false)
 const errorMessage = ref('')
 
 const redirect = computed(() => typeof route.query.redirect === 'string' ? route.query.redirect : '')
+const loginTarget = computed(() => String(route.query.target || ''))
+const isStudentLogin = computed(() => loginTarget.value === 'student')
+const clubId = computed(() => String(route.query.clubId || ''))
+const registerPath = computed(() => {
+  if (isStudentLogin.value) {
+    return `/student/register?clubId=${encodeURIComponent(clubId.value)}&redirect=${encodeURIComponent(redirect.value || '/courses')}`
+  }
+  return `/register?redirect=${encodeURIComponent(redirect.value || '/dashboard')}`
+})
+const forgotPasswordPath = computed(() => {
+  const target = isStudentLogin.value ? 'student' : 'admin'
+  const next = isStudentLogin.value ? (redirect.value || '/courses') : (redirect.value || '/dashboard')
+  return `/forgot-password?target=${target}&email=${encodeURIComponent(email.value)}&redirect=${encodeURIComponent(next)}`
+})
 
 const submit = async () => {
   if (loading.value) return
@@ -20,6 +34,15 @@ const submit = async () => {
   try {
     const result = await signIn(email.value, password.value)
     if (result.user) {
+      if (isStudentLogin.value) {
+        if (clubId.value && !await requireStudentAccess(clubId.value)) {
+          errorMessage.value = 'Voce ainda nao possui acesso a esta area de membros.'
+          return
+        }
+        setLastContext('student')
+        await navigateTo(redirect.value || '/courses')
+        return
+      }
       const target = resolvePostLoginRedirect(redirect.value)
       setLastContext(target.startsWith('/dashboard') ? 'producer' : 'student')
       await navigateTo(target)
@@ -43,7 +66,7 @@ const submit = async () => {
           </h2>
           <p class="mt-2 text-center text-base leading-5 text-gray-600">
             Ou
-            <NuxtLink :to="`/register?redirect=${encodeURIComponent(redirect || '/dashboard')}`" class="font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:underline transition ease-in-out duration-150">
+            <NuxtLink :to="registerPath" class="font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:underline transition ease-in-out duration-150">
               fazer cadastro
             </NuxtLink>
           </p>
@@ -69,7 +92,7 @@ const submit = async () => {
         </div>
         <div class="mt-2 flex items-center justify-end">
           <div class="text-sm leading-5">
-            <NuxtLink :to="`/forgot-password?target=admin&email=${encodeURIComponent(email)}&redirect=${encodeURIComponent(redirect || '/dashboard')}`" class="font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:underline transition ease-in-out duration-150">
+            <NuxtLink :to="forgotPasswordPath" class="font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none focus:underline transition ease-in-out duration-150">
               Esqueceu a senha?
             </NuxtLink>
           </div>
