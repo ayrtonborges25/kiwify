@@ -36,7 +36,7 @@ const loadWorkspaceName = async () => {
   userEmail.value = user?.email || ''
   userAvatar.value = ''
 
-  const fallbackName = normalizeAccountDisplayName(String(user?.user_metadata?.name || userEmail.value.split('@')[0] || ''))
+  const fallbackName = normalizeAccountDisplayName(String(user?.user_metadata?.name || ''), userEmail.value.split('@')[0] || 'Usuario')
   workspaceName.value = fallbackName
 
   if (!user?.id) return
@@ -47,19 +47,21 @@ const loadWorkspaceName = async () => {
       .select('name,avatar_url')
       .eq('id', user.id)
       .maybeSingle(),
-    supabase
-      .from('workspace_members')
-      .select('workspaces(name)')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle()
+      supabase
+        .from('workspace_members')
+        .select('workspaces(name, owner_id)')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle()
   ])
 
   if (profile?.avatar_url) userAvatar.value = profile.avatar_url
-  if (profile?.name) workspaceName.value = normalizeAccountDisplayName(profile.name)
+  if (profile?.name) workspaceName.value = normalizeAccountDisplayName(profile.name, fallbackName)
 
   const workspace = Array.isArray(membership?.workspaces) ? membership?.workspaces[0] : membership?.workspaces
-  if (workspace?.name) workspaceName.value = normalizeAccountDisplayName(workspace.name)
+  if (!profile?.name && workspace?.name && workspace.owner_id === user.id) {
+    workspaceName.value = normalizeAccountDisplayName(workspace.name, fallbackName)
+  }
 }
 
 const loadCourses = async () => {

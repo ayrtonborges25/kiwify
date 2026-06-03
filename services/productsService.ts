@@ -1,6 +1,6 @@
 import { products as mockProducts, type Product } from '~/data/products'
 import { createCourse, createMembersArea, deleteCourseAndMaybeMembersArea } from '~/services/membersAreaService'
-import { getCurrentWorkspace } from '~/services/permissionsService'
+import { getCurrentWorkspace, listUserWorkspaces } from '~/services/permissionsService'
 import { getSupabaseClient } from '~/utils/supabase'
 
 export type ProductSettingsPayload = {
@@ -213,6 +213,30 @@ const fallbackProducts = () => productsStore
 
 export const getProductsSnapshot = () => getSupabaseClient() ? [] : productsStore
 
+const filterOwnedProductRows = async (rows: Record<string, any>[]) => {
+  const supabase = getSupabaseClient()
+  if (!supabase) return rows
+
+  const [{ data: userData }, workspaces] = await Promise.all([
+    supabase.auth.getUser(),
+    listUserWorkspaces()
+  ])
+  const userId = userData.user?.id
+  if (!userId) return []
+
+  const ownedWorkspaceIds = new Set(
+    workspaces
+      .filter((workspace) => workspace.ownerId === userId)
+      .map((workspace) => workspace.id)
+  )
+
+  return rows.filter((row) => {
+    if ('owner_id' in row || 'user_id' in row) return row.owner_id === userId || row.user_id === userId
+    if ('workspace_id' in row) return ownedWorkspaceIds.has(row.workspace_id)
+    return true
+  })
+}
+
 const loadProductRelations = async (productIds: string[]) => {
   const supabase = getSupabaseClient()
   const relations: Record<string, { settings?: Record<string, any>; courseId?: string; membersAreaId?: string }> = {}
@@ -393,8 +417,9 @@ export const listProducts = async () => {
 
 	    if (error) return fallbackProducts()
 
-	    const relations = await loadProductRelations(data.map((product) => product.id))
-	    return data.map((product) => mapProductFromSupabase(product, relations[product.id]))
+	    const ownedProducts = await filterOwnedProductRows(data || [])
+	    const relations = await loadProductRelations(ownedProducts.map((product) => product.id))
+	    return ownedProducts.map((product) => mapProductFromSupabase(product, relations[product.id]))
 	  } catch {
 	    return fallbackProducts()
   }
@@ -413,6 +438,7 @@ export const getProductById = async (id: string) => {
 
 	    if (error) return productsStore.find((product) => product.id === id)
 	    if (!data) return undefined
+      if (!(await filterOwnedProductRows([data])).length) return undefined
 
 	    const relations = await loadProductRelations([data.id])
 	    return mapProductFromSupabase(data, relations[data.id])

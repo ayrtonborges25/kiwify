@@ -5,7 +5,8 @@ import { getSupabaseClient } from '~/utils/supabase'
 const currentUserStore = { ...mockCurrentUser }
 
 const mapProfileFromSupabase = (row: Record<string, any>, workspaceName = '') => {
-  const displayName = normalizeAccountDisplayName(workspaceName || row.name || currentUserStore.name)
+  const fallbackName = String(row.email || '').split('@')[0] || currentUserStore.name
+  const displayName = normalizeAccountDisplayName(row.name || workspaceName, fallbackName)
 
   return {
     ...currentUserStore,
@@ -38,7 +39,7 @@ export const getCurrentUser = async () => {
         .maybeSingle(),
       supabase
         .from('workspace_members')
-        .select('workspaces(name)')
+        .select('workspaces(name, owner_id)')
         .eq('user_id', userId)
         .limit(1)
         .maybeSingle()
@@ -48,7 +49,9 @@ export const getCurrentUser = async () => {
 
     const workspace = Array.isArray(membership?.workspaces) ? membership?.workspaces[0] : membership?.workspaces
 
-    return mapProfileFromSupabase(data, workspace?.name || '')
+    const ownedWorkspaceName = workspace?.owner_id === userId ? workspace?.name || '' : ''
+
+    return mapProfileFromSupabase(data, ownedWorkspaceName)
   } catch {
     return currentUserStore
   }

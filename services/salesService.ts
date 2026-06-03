@@ -1,4 +1,5 @@
 import { dashboardMetrics as mockDashboardMetrics, sales as mockSales, type Sale } from '~/data/sales'
+import { listUserWorkspaces } from '~/services/permissionsService'
 import { getSupabaseClient } from '~/utils/supabase'
 
 const salesStore: Sale[] = [...mockSales]
@@ -81,6 +82,32 @@ export const getSalesSnapshot = () => getSupabaseClient() ? [] : salesStore
 
 export const getDashboardMetricsSnapshot = () => dashboardMetricsStore
 
+const filterOwnedSaleRows = async (rows: Record<string, any>[]) => {
+  const supabase = getSupabaseClient()
+  if (!supabase) return rows
+
+  const [{ data: userData }, workspaces] = await Promise.all([
+    supabase.auth.getUser(),
+    listUserWorkspaces()
+  ])
+  const userId = userData.user?.id
+  if (!userId) return []
+
+  const ownedWorkspaceIds = new Set(
+    workspaces
+      .filter((workspace) => workspace.ownerId === userId)
+      .map((workspace) => workspace.id)
+  )
+
+  return rows.filter((row) => {
+    const product = Array.isArray(row.products) ? row.products[0] : row.products
+    if (!product) return false
+    if ('owner_id' in product || 'user_id' in product) return product.owner_id === userId || product.user_id === userId
+    if ('workspace_id' in product) return ownedWorkspaceIds.has(product.workspace_id)
+    return true
+  })
+}
+
 export const listSales = async () => {
   try {
     const supabase = getSupabaseClient()
@@ -88,12 +115,13 @@ export const listSales = async () => {
 
     const { data, error } = await supabase
       .from('sales')
-      .select('*, products(name)')
+      .select('*, products(name, user_id)')
       .order('created_at', { ascending: false })
 
     if (error) return fallbackSales()
 
-    return data.map(mapSaleFromSupabase)
+    const ownedSales = await filterOwnedSaleRows(data || [])
+    return ownedSales.map(mapSaleFromSupabase)
   } catch {
     return fallbackSales()
   }
@@ -108,11 +136,12 @@ export const getSaleById = async (id: string) => {
 
     const { data, error } = await supabase
       .from('sales')
-      .select('*, products(name)')
+      .select('*, products(name, user_id)')
       .eq('id', id)
       .maybeSingle()
 
     if (error || !data) return salesStore.find((sale) => sale.id === id)
+    if (!(await filterOwnedSaleRows([data])).length) return undefined
 
     return mapSaleFromSupabase(data)
   } catch {

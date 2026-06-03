@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { signOut } from '~/services/authService'
 import { setLastContext } from '~/services/sessionContextService'
-import { accountDisplayName, normalizeAccountDisplayName } from '~/utils/accountDisplay'
+import { normalizeAccountDisplayName } from '~/utils/accountDisplay'
 import { getSupabaseClient, uploadFile } from '~/utils/supabase'
 
 definePageMeta({ layout: false })
@@ -134,9 +134,10 @@ const loadProfile = async () => {
 
     userId.value = user.id
     email.value = user.email || ''
-    name.value = normalizeAccountDisplayName(String(user.user_metadata?.name || ''))
+    const fallbackName = email.value.split('@')[0] || 'Usuario'
+    name.value = normalizeAccountDisplayName(String(user.user_metadata?.name || ''), fallbackName)
     avatarUrl.value = ''
-    workspaceName.value = normalizeAccountDisplayName(name.value || email.value.split('@')[0])
+    workspaceName.value = normalizeAccountDisplayName(name.value, fallbackName)
 
     const [{ data: profile }, { data: membership }] = await Promise.all([
       supabase
@@ -146,21 +147,19 @@ const loadProfile = async () => {
         .maybeSingle(),
       supabase
         .from('workspace_members')
-        .select('workspace_id, workspaces(name)')
+        .select('workspace_id, workspaces(name, owner_id)')
         .eq('user_id', user.id)
         .limit(1)
         .maybeSingle()
     ])
 
     const workspace = Array.isArray(membership?.workspaces) ? membership?.workspaces[0] : membership?.workspaces
-    const rawProfileName = profile?.name || ''
-    const rawWorkspaceName = workspace?.name || ''
 
     if (profile) {
       const settings = (profile.settings || {}) as ProfileSettings
       profileSettings.value = settings
       email.value = profile.email || email.value
-      name.value = normalizeAccountDisplayName(profile.name || name.value)
+      name.value = normalizeAccountDisplayName(profile.name || name.value, fallbackName)
       avatarUrl.value = profile.avatar_url || avatarUrl.value
       whatsapp.value = settings.whatsapp || ''
       language.value = settings.language || 'PT'
@@ -174,17 +173,10 @@ const loadProfile = async () => {
     }
 
     if (membership?.workspace_id) workspaceId.value = membership.workspace_id
-    if (workspace?.name) {
-      workspaceName.value = normalizeAccountDisplayName(workspace.name)
-      name.value = workspaceName.value
+    if (workspace?.name && workspace.owner_id === user.id) {
+      workspaceName.value = normalizeAccountDisplayName(workspace.name, name.value || fallbackName)
     } else {
-      workspaceName.value = normalizeAccountDisplayName(name.value || email.value.split('@')[0])
-    }
-
-    if (normalizeAccountDisplayName(rawProfileName) !== rawProfileName || normalizeAccountDisplayName(rawWorkspaceName) !== rawWorkspaceName) {
-      name.value = accountDisplayName
-      workspaceName.value = accountDisplayName
-      await saveProfile(true)
+      workspaceName.value = normalizeAccountDisplayName(name.value || fallbackName, fallbackName)
     }
   } catch (error: any) {
     errorMessage.value = error?.message || 'Nao foi possivel carregar o perfil.'
@@ -204,7 +196,8 @@ const saveProfile = async (silent = false) => {
     if (!supabase) throw new Error('Supabase nao configurado.')
 
     const payload = profilePayload()
-    const nextName = normalizeAccountDisplayName(payload.name || workspaceName.value || email.value.split('@')[0])
+    const fallbackName = email.value.split('@')[0] || 'Usuario'
+    const nextName = normalizeAccountDisplayName(payload.name || workspaceName.value || fallbackName, fallbackName)
     const { error } = await supabase
       .from('profiles')
       .update({ ...payload, name: nextName })
@@ -236,6 +229,7 @@ const saveProfile = async (silent = false) => {
         .from('workspaces')
         .update({ name: nextName })
         .eq('id', workspaceId.value)
+        .eq('owner_id', userId.value)
     }
 
     name.value = nextName
