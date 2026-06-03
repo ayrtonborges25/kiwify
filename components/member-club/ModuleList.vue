@@ -102,6 +102,22 @@ const safeModuleImage = (src?: string) => {
   background: #fff;
 }
 
+.content-section--modules .embla__viewport,
+.content-section--modules .embla__container,
+.content-section--modules .embla__slide,
+.content-section--modules .club-image-container,
+.content-section--modules .sci__img,
+.content-section--modules img {
+  min-height: 0;
+}
+
+.content-section--modules .sci__img,
+.content-section--modules img,
+.club-module-card-empty {
+  display: block;
+  width: 100%;
+}
+
 @media (min-width: 640px) {
   .content-section--modules .kiwi-section__title {
     margin-bottom: .75rem;

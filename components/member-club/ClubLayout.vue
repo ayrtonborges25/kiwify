@@ -218,12 +218,12 @@ const lessonDescriptionParts = computed(() => {
             </section>
           </div>
         </div>
-        <footer class="py-6 px-4 text-xs flex flex-row items-center justify-center gap-2 hidden md:flex" id="club__content__footer">
-          <span><strong>{{ data?.course.title || data?.club.title }}</strong> is powered by </span>
-          <a href="https://kiwify.com.br" rel="noopener noreferrer" target="kiwify" class="leading-[0px] p-1 -m-1 rounded">Kiwify</a>
-        </footer>
       </template>
       </main>
+      <footer v-if="!activeLesson" class="py-6 px-4 text-xs flex flex-row items-center justify-center gap-2 hidden md:flex" id="club__content__footer">
+        <span><strong>{{ data?.course.title || data?.club.title }}</strong> is powered by </span>
+        <a href="https://kiwify.com.br" rel="noopener noreferrer" target="kiwify" class="leading-[0px] p-1 -m-1 rounded">Kiwify</a>
+      </footer>
     </aside>
 
     <aside class="fixed bottom-0 inset-x-0 z-20 md:hidden bg-primary-500" id="club__bottom_nav">
@@ -274,12 +274,13 @@ const lessonDescriptionParts = computed(() => {
 }
 
 .club-page__content-main {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
-  min-height: 0;
+  min-height: 100vh;
+  min-height: 100svh;
   margin: 0;
   padding: 0;
 }
