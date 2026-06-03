@@ -10,7 +10,7 @@ type DeliveryEmailSale = {
 
 type DeliveryEmailDelivery = {
   id: string
-  sale_id: string
+  sale_id?: string | null
   product_id?: string | null
   customer_email?: string | null
   access_url?: string | null
@@ -53,10 +53,10 @@ const buildDeliveryEmailHtml = ({
             </tr>
             <tr>
               <td style="padding:32px 32px 20px;">
-                <p style="margin:0 0 12px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#64748b;font-weight:700;">Compra aprovada</p>
+                <p style="margin:0 0 12px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#64748b;font-weight:700;">Acesso liberado</p>
                 <h1 style="margin:0;font-size:28px;line-height:1.2;color:#0f172a;">Seu acesso foi liberado</h1>
                 <p style="margin:18px 0 0;font-size:16px;line-height:1.6;color:#475569;">
-                  O pagamento do produto <strong style="color:#111827;">${escapeHtml(productName)}</strong> foi aprovado.
+                  Seu acesso ao produto <strong style="color:#111827;">${escapeHtml(productName)}</strong> foi liberado.
                   Use o botão abaixo para entrar na área de acesso.
                 </p>
               </td>
@@ -90,9 +90,10 @@ const buildDeliveryEmailHtml = ({
 export const sendProductAccessEmail = async (
   supabase: SupabaseLike,
   sale: DeliveryEmailSale,
-  delivery: DeliveryEmailDelivery | null
+  delivery: DeliveryEmailDelivery | null,
+  options: { force?: boolean } = {}
 ) => {
-  if (!delivery || delivery.access_email_sent_at) return false
+  if (!delivery || (delivery.access_email_sent_at && !options.force)) return false
 
   const config = useRuntimeConfig()
   const resendApiKey = String(config.resendApiKey || '')
@@ -114,7 +115,7 @@ export const sendProductAccessEmail = async (
     productName = product?.name || productName
   }
 
-  const accessUrl = absoluteUrl(String(config.appUrl || 'http://localhost:3000'), '/courses')
+  const accessUrl = absoluteUrl(String(config.appUrl || 'http://localhost:3000'), delivery.access_url || '/courses')
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',

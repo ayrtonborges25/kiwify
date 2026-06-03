@@ -15,6 +15,10 @@ const {
   listCourseModules,
   listMembersAreaStudents,
   listMembersAreaGroups,
+  addMembersAreaStudent,
+  resendMembersAreaStudentAccess,
+  removeMembersAreaStudentAccess,
+  updateMembersAreaStudent,
   saveMembersAreaGroups,
   saveMembersAreaSettings,
   createModule,
@@ -39,6 +43,22 @@ const membersDataLoading = ref(false)
 const settingsSaving = ref(false)
 const moduleImageUploading = ref(false)
 const groupDraft = ref('')
+const editingGroupId = ref('')
+const showGroupModal = ref(false)
+const showCreateCourseModal = ref(false)
+const showImportCourseModal = ref(false)
+const courseDraft = ref('')
+const showAddStudentModal = ref(false)
+const addingStudent = ref(false)
+const addStudentError = ref('')
+const studentActionError = ref('')
+const editingStudentId = ref('')
+const openStudentMenuId = ref('')
+const studentDraft = reactive({
+  name: '',
+  email: '',
+  groupId: ''
+})
 const openModuleMenuId = ref('')
 const showModuleModal = ref(false)
 const showAddMenu = ref(false)
@@ -65,7 +85,10 @@ const lessonForm = reactive({
 })
 const settingsForm = reactive({
   type: 'complete' as 'lite' | 'complete',
-  commentsEnabled: false
+  commentsEnabled: false,
+  language: 'PT',
+  antiPiracyEnabled: false,
+  supportEmail: ''
 })
 const selectedCourse = computed(() => courses.value[0])
 const moduleCount = computed(() => courseModules.value.length || Math.max(1, Number((membersArea.value as any)?.modules || courses.value.length || 1)))
@@ -81,12 +104,14 @@ const tabs = [
   { key: 'courses', label: 'Cursos', icon: 'M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z' },
   { key: 'students', label: 'Alunos', icon: 'M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z' },
   { key: 'groups', label: 'Grupos', icon: 'M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM13 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2h-2zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM13 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2h-2z' },
-  { key: 'settings', label: 'Configurações', icon: 'M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947z' },
-  { key: 'customizations', label: 'Personalizações', icon: 'M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z' }
+  { key: 'customizations', label: 'Configurações', icon: 'M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947z' },
+  { key: 'editClubMobile', label: 'Personalizações (apenas Desktop)', icon: 'M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z' }
 ]
 
 const tabPath = (tab: string) => tab === 'customizations'
-  ? editorPath.value
+  ? `/members-area/${membersAreaId.value}?tab=customizations`
+  : tab === 'editClubMobile'
+    ? editorPath.value
   : `/members-area/${membersAreaId.value}?tab=${tab}${tab === 'courses' && courseId.value ? `&course=${courseId.value}` : ''}`
 const coursePath = (id = defaultCourseId.value) => `/members-area/${membersAreaId.value}?tab=courses&course=${id}`
 const contentEditPath = (lessonId: string) => `/members-area/${membersAreaId.value}?tab=courses&course=${activeCourseId.value}&content=${lessonId}`
@@ -119,7 +144,10 @@ const loadMembersAreaData = async () => {
     groups.value = groupRows
     Object.assign(settingsForm, {
       type: membersArea.value?.settings?.type || 'complete',
-      commentsEnabled: Boolean(membersArea.value?.settings?.commentsEnabled)
+      commentsEnabled: Boolean(membersArea.value?.settings?.commentsEnabled),
+      language: membersArea.value?.settings?.language || 'PT',
+      antiPiracyEnabled: Boolean(membersArea.value?.settings?.antiPiracyEnabled),
+      supportEmail: membersArea.value?.settings?.supportEmail || ''
     })
   } finally {
     membersDataLoading.value = false
@@ -350,6 +378,30 @@ const removeAttachment = (attachmentId: string) => {
   lessonForm.attachments = lessonForm.attachments.filter((attachment) => attachment.id !== attachmentId)
 }
 
+const openCreateCourseModal = () => {
+  courseDraft.value = ''
+  showCreateCourseModal.value = true
+}
+
+const openImportCourseModal = () => {
+  courseDraft.value = ''
+  showImportCourseModal.value = true
+}
+
+const closeCourseModals = () => {
+  showCreateCourseModal.value = false
+  showImportCourseModal.value = false
+  courseDraft.value = ''
+}
+
+const createCourseFromModal = () => {
+  closeCourseModals()
+}
+
+const importCourseFromModal = () => {
+  closeCourseModals()
+}
+
 watch(() => route.query.content, (contentId) => {
   if (!contentId || !isCourseOpen.value) return
   if (contentId === 'new') {
@@ -365,9 +417,25 @@ watch(() => route.query.content, (contentId) => {
 
 const addGroup = async () => {
   const name = groupDraft.value.trim() || `Grupo ${String.fromCharCode(65 + groups.value.length)}`
-  const nextGroups = [...groups.value, { id: `group-${Date.now()}`, name, students: 0, isDefault: false }]
+  const nextGroups = editingGroupId.value
+    ? groups.value.map((group) => group.id === editingGroupId.value ? { ...group, name } : group)
+    : [...groups.value, { id: `group-${Date.now()}`, name, students: 0, isDefault: false }]
   groups.value = await saveMembersAreaGroups(membersAreaId.value, nextGroups)
   groupDraft.value = ''
+  editingGroupId.value = ''
+  showGroupModal.value = false
+}
+
+const openCreateGroupModal = () => {
+  groupDraft.value = `Grupo ${String.fromCharCode(65 + groups.value.length)}`
+  editingGroupId.value = ''
+  showGroupModal.value = true
+}
+
+const openEditGroupModal = (group: any) => {
+  groupDraft.value = group.name || ''
+  editingGroupId.value = group.id || ''
+  showGroupModal.value = true
 }
 
 const removeGroup = async (groupId: string) => {
@@ -375,12 +443,104 @@ const removeGroup = async (groupId: string) => {
   groups.value = await saveMembersAreaGroups(membersAreaId.value, nextGroups)
 }
 
+const openAddStudentModal = () => {
+  addStudentError.value = ''
+  studentActionError.value = ''
+  editingStudentId.value = ''
+  openStudentMenuId.value = ''
+  studentDraft.name = ''
+  studentDraft.email = ''
+  studentDraft.groupId = groups.value[0]?.id || ''
+  showAddStudentModal.value = true
+}
+
+const closeAddStudentModal = () => {
+  if (addingStudent.value) return
+  showAddStudentModal.value = false
+  addStudentError.value = ''
+  editingStudentId.value = ''
+}
+
+const reloadStudentsAndGroups = async () => {
+  const [studentRows, groupRows] = await Promise.all([
+    listMembersAreaStudents(membersAreaId.value),
+    listMembersAreaGroups(membersAreaId.value)
+  ])
+  students.value = studentRows
+  groups.value = groupRows
+}
+
+const submitAddStudent = async () => {
+  addStudentError.value = ''
+  if (!studentDraft.email.trim()) {
+    addStudentError.value = 'Informe o e-mail do aluno.'
+    return
+  }
+
+  addingStudent.value = true
+  try {
+    const payload = {
+      name: studentDraft.name,
+      email: studentDraft.email,
+      groupId: studentDraft.groupId
+    }
+    if (editingStudentId.value) await updateMembersAreaStudent(membersAreaId.value, editingStudentId.value, payload)
+    else await addMembersAreaStudent(membersAreaId.value, payload)
+    await reloadStudentsAndGroups()
+    showAddStudentModal.value = false
+  } catch (error) {
+    addStudentError.value = error instanceof Error ? error.message : (editingStudentId.value ? 'Nao foi possivel editar o aluno.' : 'Nao foi possivel adicionar o aluno.')
+  } finally {
+    addingStudent.value = false
+  }
+}
+
+const toggleStudentMenu = (studentId: string) => {
+  studentActionError.value = ''
+  openStudentMenuId.value = openStudentMenuId.value === studentId ? '' : studentId
+}
+
+const resendStudentAccess = async (student: any) => {
+  studentActionError.value = ''
+  try {
+    await resendMembersAreaStudentAccess(membersAreaId.value, student.id)
+    openStudentMenuId.value = ''
+  } catch (error) {
+    studentActionError.value = error instanceof Error ? error.message : 'Nao foi possivel reenviar o email de acesso.'
+  }
+}
+
+const removeStudentAccess = async (student: any) => {
+  studentActionError.value = ''
+  try {
+    await removeMembersAreaStudentAccess(membersAreaId.value, student.id)
+    openStudentMenuId.value = ''
+    await reloadStudentsAndGroups()
+  } catch (error) {
+    studentActionError.value = error instanceof Error ? error.message : 'Nao foi possivel remover o acesso.'
+  }
+}
+
+const openEditStudentModal = (student: any) => {
+  studentActionError.value = ''
+  addStudentError.value = ''
+  editingStudentId.value = student.id || ''
+  studentDraft.name = student.name || ''
+  studentDraft.email = student.email || ''
+  studentDraft.groupId = groups.value[0]?.id || ''
+  openStudentMenuId.value = ''
+  showAddStudentModal.value = true
+}
+
 const saveSettings = async () => {
   settingsSaving.value = true
   try {
     await saveMembersAreaSettings(membersAreaId.value, {
       type: settingsForm.type,
-      commentsEnabled: settingsForm.commentsEnabled
+      commentsEnabled: settingsForm.commentsEnabled,
+      language: settingsForm.language,
+      antiPiracyEnabled: settingsForm.antiPiracyEnabled,
+      supportEmail: settingsForm.supportEmail
     })
   } finally {
     settingsSaving.value = false
@@ -421,8 +581,8 @@ onBeforeUnmount(() => {
             <option value="courses">Cursos</option>
             <option value="students">Alunos</option>
             <option value="groups">Grupos</option>
-            <option value="settings">Configurações</option>
-            <option value="customizations">Personalizações</option>
+            <option value="customizations">Configurações</option>
+            <option disabled value="editClubMobile">Personalizações (apenas Desktop)</option>
           </select>
         </div>
         <div class="hidden md:block">
@@ -450,9 +610,9 @@ onBeforeUnmount(() => {
         <div class="mt-8 md:px-10">
           <div class="page-header flex-wrap">
             <div class="page-title" style="padding-block: 7px;">Cursos</div>
-            <div class="flex items-center">
-              <button type="button" class="mr-2 inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-700 hover:text-gray-500 active:text-gray-800 bg-white active:bg-gray-50 border-gray-300 focus:border-blue-300 focus:shadow-outline-blue leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm">Importar curso</button>
-              <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 border-transparent focus:border-indigo-700 focus:shadow-outline-indigo leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm">Criar curso</button>
+            <div>
+              <button type="button" class="mr-2 inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-700 hover:text-gray-500 active:text-gray-800 bg-white active:bg-gray-50 border-gray-300 focus:border-blue-300 focus:shadow-outline-blue leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm" @click="openImportCourseModal">Importar curso</button>
+              <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 border-transparent focus:border-indigo-700 focus:shadow-outline-indigo leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm" @click="openCreateCourseModal">Criar curso</button>
             </div>
           </div>
 
@@ -496,74 +656,125 @@ onBeforeUnmount(() => {
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="24px" height="24px" class="h-5 w-5"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
                 Exportar
               </button>
-              <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 border-transparent focus:border-indigo-700 focus:shadow-outline-indigo leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm">Adicionar aluno</button>
+              <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 border-transparent focus:border-indigo-700 focus:shadow-outline-indigo leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm" @click="openAddStudentModal">Adicionar aluno</button>
             </div>
           </div>
 
-          <div class="mt-8 bg-white p-6">
-            <div class="relative rounded-md shadow-sm flex">
-              <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="24px" height="24px" class="h-6 w-6 text-gray-400"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"></path></svg>
+          <div class="mt-8 px-4 py-3 sm:p-6 bg-white">
+            <div class="flex rounded-md shadow-sm">
+              <div class="relative flex-grow focus-within:z-10">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg viewBox="0 0 20 20" fill="currentColor" class="search h-5 w-5 text-gray-400"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"></path></svg>
+                </div>
+                <input placeholder="Buscar..." class="form-input block w-full rounded-none rounded-l-md pl-10 transition ease-in-out duration-150 sm:text-sm sm:leading-5">
               </div>
-              <input placeholder="Buscar..." class="form-input block w-full py-4 pl-14 pr-4 border border-gray-300 rounded-l-md shadow-sm focus:outline-none focus:shadow-outline-blue focus:border-blue-300 transition duration-150 ease-in-out text-base leading-6">
-              <button type="button" class="inline-flex items-center px-6 border border-l-0 border-gray-300 rounded-r-md text-gray-700 bg-white text-base leading-6 font-medium">
-                <span class="mr-2 text-gray-400">≡</span>
-                Filtros
+              <button type="button" class="cursor-pointer -ml-px relative inline-flex items-center pl-4 py-2 border border-gray-300 text-sm leading-5 font-medium rounded-r-md text-gray-700 bg-gray-50 hover:text-gray-500 hover:bg-white focus:outline-none focus:shadow-outline-blue focus:border-blue-300 active:bg-gray-100 active:text-gray-700 transition ease-in-out duration-150">
+                <svg viewBox="0 0 20 20" fill="currentColor" class="adjustments h-5 w-5 text-gray-400"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 000 2h12a1 1 0 100-2H4zM6 11a1 1 0 100 2h8a1 1 0 100-2H6zM9 15a1 1 0 100 2h2a1 1 0 100-2H9z"></path></svg>
+                <div class="ml-2"><span class="mr-4">Filtros</span></div>
               </button>
             </div>
           </div>
 
-          <div class="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
-            <div class="bg-white rounded-lg shadow p-6">
-              <div class="text-base text-gray-500">Número de alunos</div>
-              <div class="mt-4 text-3xl font-bold text-gray-900">{{ students.length }}</div>
-            </div>
-            <div class="bg-white rounded-lg shadow p-6">
-              <div class="text-base text-gray-500">Progresso</div>
-              <div class="mt-4 text-3xl font-bold text-gray-900">{{ students.length ? (students.reduce((total, student) => total + Number(student.progress || 0), 0) / students.length).toFixed(2) : '0.00' }} %</div>
-              <div class="mt-2 text-sm text-gray-500">média dos usuários</div>
-            </div>
-            <div class="bg-white rounded-lg shadow p-6">
-              <div class="text-base text-gray-500">Conclusão</div>
-              <div class="mt-4 text-3xl font-bold text-gray-900">{{ students.length ? ((students.filter((student) => Number(student.progress || 0) >= 100).length / students.length) * 100).toFixed(2) : '0.00' }} %</div>
-              <div class="mt-2 text-sm text-gray-500">concluíram o curso</div>
+          <div class="my-4">
+            <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
+              <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-4">
+                  <dl>
+                    <dt class="text-sm leading-5 font-medium text-gray-500 truncate">Número de alunos</dt>
+                    <dd class="mt-1 text-2xl leading-9 font-semibold text-gray-900">{{ students.length }}</dd>
+                  </dl>
+                </div>
+              </div>
+              <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-4">
+                  <dl>
+                    <dt class="text-sm leading-5 font-medium text-gray-500 truncate">Progresso</dt>
+                    <dd class="mt-1 text-2xl leading-9 font-semibold text-gray-900">{{ students.length ? (students.reduce((total, student) => total + Number(student.progress || 0), 0) / students.length).toFixed(2) : '0.00' }} %</dd>
+                    <dd class="text-sm leading-5 text-gray-500">média dos usuários</dd>
+                  </dl>
+                </div>
+              </div>
+              <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-4">
+                  <dl>
+                    <dt class="text-sm leading-5 font-medium text-gray-500 truncate">Conclusão</dt>
+                    <dd class="mt-1 text-2xl leading-9 font-semibold text-gray-900">{{ students.length ? ((students.filter((student) => Number(student.progress || 0) >= 100).length / students.length) * 100).toFixed(2) : '0.00' }} %</dd>
+                    <dd class="text-sm leading-5 text-gray-500">concluíram o curso</dd>
+                  </dl>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div class="mt-6 bg-white overflow-hidden">
-            <div class="overflow-x-auto">
-              <table class="kiwi-table min-w-full divide-y divide-gray-200">
+          <div class="w-full">
+            <div v-if="studentActionError" class="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700">{{ studentActionError }}</div>
+            <div class="flex flex-col">
+              <div class="overflow-x-auto md:overflow-visible">
+                <div class="align-middle inline-block min-w-full">
+                  <table class="kiwi-table min-w-full divide-y divide-gray-200">
                 <thead>
                   <tr>
-                    <th class="text-left px-6 py-4 border-b border-gray-200 bg-gray-50 text-xs leading-4 font-medium text-gray-500 uppercase tracking-widest">Nome</th>
-                    <th class="text-left px-6 py-4 border-b border-gray-200 bg-gray-50 text-xs leading-4 font-medium text-gray-500 uppercase tracking-widest">Último acesso</th>
-                    <th class="text-left px-6 py-4 border-b border-gray-200 bg-gray-50 text-xs leading-4 font-medium text-gray-500 uppercase tracking-widest">Progresso</th>
-                    <th class="text-left px-6 py-4 border-b border-gray-200 bg-gray-50 text-xs leading-4 font-medium text-gray-500 uppercase tracking-widest"></th>
+                    <th class="text-left px-6 py-3 border-b border-gray-200 bg-gray-50 text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+                    <th class="text-left px-6 py-3 border-b border-gray-200 bg-gray-50 text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">Último acesso</th>
+                    <th class="text-left px-6 py-3 border-b border-gray-200 bg-gray-50 text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider">Progresso</th>
+                    <th class="text-left px-6 py-3 border-b border-gray-200 bg-gray-50 text-xs leading-4 font-medium text-gray-500 uppercase tracking-wider"></th>
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                   <tr v-if="membersDataLoading">
-                    <td colspan="4" class="px-6 py-8 text-center text-sm text-gray-500">Carregando alunos...</td>
+                    <td colspan="4" class="px-6 py-4 text-center text-sm leading-5 text-gray-500">Carregando alunos...</td>
                   </tr>
                   <tr v-else-if="!students.length">
-                    <td colspan="4" class="px-6 py-8 text-center text-sm text-gray-500">Nenhum comprador aprovado encontrado.</td>
+                    <td colspan="4" class="px-6 py-4 text-center text-sm leading-5 text-gray-500">Nenhum comprador aprovado encontrado.</td>
                   </tr>
                   <tr v-for="student in students" v-else :key="student.id" :class="student.isCurrentUser ? 'bg-gray-50' : 'bg-white'">
-                    <td class="px-6 py-5 whitespace-nowrap">
-                      <div class="text-sm font-medium text-gray-900">{{ student.name }}</div>
-                      <div class="mt-1 text-sm text-gray-500">✉ {{ student.email }}</div>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="text-sm leading-5 font-medium text-gray-900">{{ student.name }}</div>
+                      <div class="text-sm leading-5 text-gray-500 flex items-center gap-1">
+                        <svg viewBox="0 0 20 20" fill="currentColor" class="mail h-4 w-4 text-gray-400"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path></svg>
+                        {{ student.email }}
+                      </div>
                     </td>
-                    <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-500">{{ student.lastAccess }}</td>
-                    <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-500">{{ student.progress }}%</td>
-                    <td v-if="student.isCurrentUser" class="px-6 py-5 whitespace-nowrap text-right"><span class="inline-flex items-center rounded-full font-medium leading-4 text-xs py-1 px-3 bg-green-100 text-green-800">Você</span></td>
-                    <td v-else class="px-6 py-5 whitespace-nowrap text-right">
-                      <button type="button" class="inline-flex justify-center rounded-md border border-gray-300 p-2 bg-white text-gray-700 shadow-sm">
-                        <svg fill="currentColor" viewBox="0 0 20 20" class="h-5 w-5"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>
-                      </button>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm leading-5 text-gray-500">{{ student.lastAccess }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm leading-5 text-gray-500">{{ student.progress }}%</td>
+                    <td v-if="student.isCurrentUser" class="px-6 py-4 whitespace-nowrap text-right"><span class="inline-flex items-center rounded-full font-medium leading-4 text-xs py-0.5 px-2.5 bg-green-100 text-green-800">Você</span></td>
+                    <td v-else class="px-6 py-4 whitespace-nowrap text-right">
+                      <div class="relative inline-block">
+                        <div slot="reference">
+                          <span class="rounded-md block shadow-sm relative dropdown-trigger">
+                            <button id="options-menu" type="button" class="inline-flex justify-center w-full rounded-md border border-gray-300 p-2 bg-white text-sm leading-5 font-medium text-gray-700 hover:text-gray-500 focus:outline-none focus:shadow-outline-indigo active:bg-gray-50 active:text-gray-800 transition ease-in-out duration-150" @click.stop="toggleStudentMenu(student.id)">
+                              <svg fill="currentColor" viewBox="0 0 20 20" class="h-5 w-5"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>
+                            </button>
+                          </span>
+                        </div>
+                        <div class="dropdown z-50 absolute right-0 mt-2" :style="{ display: openStudentMenuId === student.id ? 'block' : 'none' }" @click.stop>
+                          <div class="min-w-scale z-50 rounded-md shadow-lg" :style="{ display: openStudentMenuId === student.id ? 'block' : 'none' }">
+                            <div class="rounded-md bg-white shadow-xs">
+                              <div class="py-1 cursor-pointer">
+                                <div role="menuitem" class="group flex cursor-pointer items-center px-4 py-2 gap-x-3 text-sm leading-5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:bg-gray-100 focus:text-gray-900" @click="resendStudentAccess(student)">
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="24px" height="24px" class="h-5 w-5 text-gray-400 group-hover:text-gray-500 group-focus:text-gray-500" style="min-width: 20px; min-height: 20px;"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path></svg>
+                                  <div class="flex items-center justify-between w-full"><span>Reenviar email de acesso</span></div>
+                                </div>
+                                <div role="menuitem" class="group flex cursor-pointer items-center px-4 py-2 gap-x-3 text-sm leading-5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:bg-gray-100 focus:text-gray-900" @click="removeStudentAccess(student)">
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="24px" height="24px" class="h-5 w-5 text-gray-400 group-hover:text-gray-500 group-focus:text-gray-500" style="min-width: 20px; min-height: 20px;"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+                                  <div class="flex items-center justify-between w-full"><span>Remover acesso</span></div>
+                                </div>
+                                <div role="menuitem" class="group flex cursor-pointer items-center px-4 py-2 gap-x-3 text-sm leading-5 text-gray-700 hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:bg-gray-100 focus:text-gray-900" @click="openEditStudentModal(student)">
+                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24px" height="24px" class="h-5 w-5 text-gray-400 group-hover:text-gray-500 group-focus:text-gray-500" style="min-width: 20px; min-height: 20px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                                  <div class="flex items-center justify-between w-full"><span>Editar</span></div>
+                                </div>
+                              </div>
+                              <div class="border-t border-gray-100"></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 </tbody>
-              </table>
+                  </table>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -574,8 +785,7 @@ onBeforeUnmount(() => {
           <div class="page-header flex-wrap gap-4 xl:flex-no-wrap">
             <div class="page-title truncate py-1">Grupos</div>
             <div class="flex items-center gap-3">
-              <input v-model="groupDraft" placeholder="Nome do grupo" class="form-input block w-48 py-2 px-3 border border-gray-300 rounded-md shadow-sm text-sm">
-              <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 border-transparent focus:border-indigo-700 focus:shadow-outline-indigo leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm" @click="addGroup">Adicionar grupo</button>
+              <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 border-transparent focus:border-indigo-700 focus:shadow-outline-indigo leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm" @click="openCreateGroupModal">Adicionar grupo</button>
             </div>
           </div>
 
@@ -600,7 +810,7 @@ onBeforeUnmount(() => {
                     </td>
                     <td class="px-6 py-6 whitespace-nowrap text-sm text-gray-500">{{ group.students }}</td>
                     <td class="px-6 py-6 whitespace-nowrap text-right">
-                      <button type="button" class="inline-flex justify-center rounded-md border border-gray-300 p-2 bg-white text-gray-700 shadow-sm" :disabled="group.isDefault" @click="removeGroup(group.id)">
+                      <button type="button" class="inline-flex justify-center rounded-md border border-gray-300 p-2 bg-white text-gray-700 shadow-sm" @click="openEditGroupModal(group)">
                         <svg fill="currentColor" viewBox="0 0 20 20" class="h-5 w-5"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"></path></svg>
                       </button>
                     </td>
@@ -619,64 +829,155 @@ onBeforeUnmount(() => {
         </div>
       </template>
 
-      <template v-else-if="!isCourseOpen && activeTab === 'settings'">
+      <template v-else-if="!isCourseOpen && activeTab === 'customizations'">
         <div class="md:px-10 mt-8">
-          <div class="page-header flex-wrap gap-4 xl:flex-no-wrap">
-            <div class="page-title truncate py-1">Configurações</div>
-            <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 border-transparent focus:border-indigo-700 focus:shadow-outline-indigo leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm" :disabled="settingsSaving" @click="saveSettings">{{ settingsSaving ? 'Salvando...' : 'Salvar alterações' }}</button>
+          <div class="page-header">
+            <div class="page-title">Configurações</div>
+            <div class="flex justify-end">
+              <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 border-transparent focus:border-indigo-700 focus:shadow-outline-indigo leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm" :disabled="settingsSaving" @click="saveSettings">
+                {{ settingsSaving ? 'Salvando...' : 'Salvar alterações' }}
+              </button>
+            </div>
           </div>
 
-          <div class="mt-8 space-y-8">
-            <div class="md:grid md:grid-cols-3 md:gap-8">
-              <div>
+          <div>
+            <div class="mt-10">
+              <div class="md:grid md:grid-cols-3 md:gap-6">
+                <div class="md:col-span-1">
                 <h3 class="text-lg font-medium leading-6 text-gray-900">Tipo de área de membros</h3>
-                <p class="mt-3 text-sm leading-5 text-gray-500">Aprenda mais sobre os <a href="#" class="text-indigo-500 underline">tipos de área de membros</a></p>
+                  <p class="mt-1 desc text-sm leading-5 text-gray-500">Aprenda mais sobre os <a href="https://ajuda.kiwify.com.br/pt-br/article/nova-area-de-membros-kiwify-19odfp8/?bust=1737391616084" target="_blank">tipos de área de membros</a></p>
               </div>
               <div class="mt-5 md:mt-0 md:col-span-2">
-                <div class="bg-white rounded-lg p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <button type="button" class="text-left border rounded-md p-6 relative" :class="settingsForm.type === 'lite' ? 'border-indigo-500' : 'border-gray-300'" @click="settingsForm.type = 'lite'">
-                    <div class="flex justify-between items-start">
-                      <h4 class="text-base font-medium text-gray-900">Lite</h4>
-                      <svg class="h-7 w-7 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                    </div>
-                    <ul class="mt-5 space-y-3 text-sm text-gray-700">
-                      <li class="flex gap-2"><span class="text-indigo-500">▮</span> Apenas um curso</li>
-                      <li class="flex gap-2"><span class="text-gray-400">⚙</span> Fácil configuração</li>
-                      <li class="flex gap-2"><span class="text-gray-400">⌁</span> Personalização básica</li>
-                      <li class="flex gap-2"><span class="text-yellow-600">★</span> Recomendado para iniciantes</li>
+                  <div class="relative">
+                    <div class="p-4 bg-white sm:p-6 rounded-lg">
+                      <div class="flex flex-col sm:flex-row gap-4">
+                        <label for="members-area--kind--lite--input" class="relative flex-1 p-4 border rounded-md outline-none focus:outline-none cursor-pointer" :class="settingsForm.type === 'lite' ? 'border-indigo-500' : ''">
+                          <input id="members-area--kind--lite--input" v-model="settingsForm.type" name="members-area--kind" type="radio" class="form-checkbox text-indigo-500 rounded-full w-7 h-7 absolute" value="lite" style="bottom: -0.75rem; right: -0.75rem; background-size: 85% 85%;" :class="settingsForm.type === 'lite' ? '' : 'invisible'">
+                          <span class="flex flex-row items-center gap-2"><span class="block text-sm leading-4 font-medium text-gray-700">Lite</span></span>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24px" height="24px" class="absolute top-3 right-3 w-6 h-6 text-gray-700"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                          <ul class="flex flex-col items-stretch gap-1 sm:gap-1.5 pt-2 sm:pt-4 text-xxs sm:text-xs text-gray-900">
+                            <li>📕 Apenas um curso</li>
+                            <li>⚙️ Fácil configuração</li>
+                            <li>🔧 Personalização básica</li>
+                            <li>🧑‍🎓 Recomendado para iniciantes</li>
                     </ul>
-                    <span v-if="settingsForm.type === 'lite'" class="absolute -right-4 -bottom-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-indigo-500 text-white text-xl">✓</span>
-                  </button>
-                  <button type="button" class="text-left border rounded-md p-6 relative" :class="settingsForm.type === 'complete' ? 'border-indigo-500' : 'border-gray-300'" @click="settingsForm.type = 'complete'">
-                    <div class="flex justify-between items-start">
-                      <h4 class="text-base font-medium text-gray-900">Completa</h4>
-                      <svg class="h-7 w-7 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7h-4V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2H4a2 2 0 00-2 2v9a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zM10 7V5h4v2"></path></svg>
+                        </label>
+                        <label for="members-area--kind--full--input" class="relative flex-1 p-4 border rounded-md outline-none focus:outline-none cursor-pointer" :class="settingsForm.type === 'complete' ? 'border-indigo-500' : ''">
+                          <input id="members-area--kind--full--input" v-model="settingsForm.type" name="members-area--kind" type="radio" class="form-checkbox text-indigo-500 rounded-full w-7 h-7 absolute" value="complete" style="bottom: -0.75rem; right: -0.75rem; background-size: 85% 85%;" :class="settingsForm.type === 'complete' ? '' : 'invisible'">
+                          <span class="flex flex-row items-center gap-2"><span class="block text-sm leading-4 font-medium text-gray-700">Completa</span></span>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="24px" height="24px" class="absolute top-3 right-3 w-6 h-6 text-gray-700"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                          <ul class="flex flex-col items-stretch gap-1 sm:gap-1.5 pt-2 sm:pt-4 text-xxs sm:text-xs text-gray-900">
+                            <li>📚 Múltiplos cursos</li>
+                            <li>🌐 Domínio próprio</li>
+                            <li>🛠️ Personalização completa</li>
+                            <li>🧑‍🔬 Recomendado para infoprodutores avançados</li>
+                          </ul>
+                        </label>
+                      </div>
                     </div>
-                    <ul class="mt-5 space-y-3 text-sm text-gray-700">
-                      <li class="flex gap-2"><span class="text-green-500">▰</span> Múltiplos cursos</li>
-                      <li class="flex gap-2"><span class="text-blue-500">◎</span> Domínio próprio</li>
-                      <li class="flex gap-2"><span class="text-gray-400">⌁</span> Personalização completa</li>
-                      <li class="flex gap-2"><span class="text-yellow-600">★</span> Recomendado para infoprodutores avançados</li>
-                    </ul>
-                    <span v-if="settingsForm.type === 'complete'" class="absolute -right-4 -bottom-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-indigo-500 text-white text-xl">✓</span>
-                  </button>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div class="md:grid md:grid-cols-3 md:gap-8">
-              <div>
+            <div class="mt-10">
+              <div class="md:grid md:grid-cols-3 md:gap-6">
+                <div class="md:col-span-1">
                 <h3 class="text-lg font-medium leading-6 text-gray-900">Comentários</h3>
-                <p class="mt-3 text-sm leading-5 text-gray-500">Aprenda mais sobre os <a href="#" class="text-indigo-500 underline">comentários</a></p>
+                  <p class="mt-1 desc text-sm leading-5 text-gray-500">Aprenda mais sobre os <a href="https://ajuda.kiwify.com.br/pt-br/article/como-funcionam-os-comentarios-16twmzb/?1607867513226" target="_blank">comentários</a></p>
               </div>
               <div class="mt-5 md:mt-0 md:col-span-2">
-                <div class="bg-white rounded-lg px-6 py-8 flex items-center">
-                  <span role="checkbox" tabindex="0" :aria-checked="settingsForm.commentsEnabled" class="relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:shadow-outline" :class="settingsForm.commentsEnabled ? 'bg-indigo-600' : 'bg-gray-200'" @click="settingsForm.commentsEnabled = !settingsForm.commentsEnabled" @keydown.enter.prevent="settingsForm.commentsEnabled = !settingsForm.commentsEnabled">
-                    <span aria-hidden="true" class="inline-block h-5 w-5 rounded-full bg-white shadow transform transition ease-in-out duration-200" :class="settingsForm.commentsEnabled ? 'translate-x-5' : 'translate-x-0'"></span>
-                  </span>
-                  <label class="block text-sm font-medium leading-5 text-gray-700 ml-3 cursor-pointer" @click="settingsForm.commentsEnabled = !settingsForm.commentsEnabled">Ativar comentários</label>
+                  <div class="relative">
+                    <div class="px-4 py-5 bg-white sm:p-6 rounded-lg">
+                      <div class="flex item-center">
+                        <div class="flex items-center">
+                          <span role="checkbox" tabindex="0" :aria-checked="settingsForm.commentsEnabled" class="relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:shadow-outline" :class="settingsForm.commentsEnabled ? 'bg-indigo-600' : 'bg-gray-200'" @click="settingsForm.commentsEnabled = !settingsForm.commentsEnabled" @keydown.enter.prevent="settingsForm.commentsEnabled = !settingsForm.commentsEnabled">
+                            <span aria-hidden="true" class="inline-block h-5 w-5 rounded-full bg-white shadow transform transition ease-in-out duration-200" :class="settingsForm.commentsEnabled ? 'translate-x-5' : 'translate-x-0'"></span>
+                          </span>
+                          <label class="block text-sm font-medium leading-5 text-gray-700 ml-2 cursor-pointer" @click="settingsForm.commentsEnabled = !settingsForm.commentsEnabled">Ativar comentários</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
+            </div>
+
+            <div class="mt-10">
+              <div class="md:grid md:grid-cols-3 md:gap-6">
+                <div class="md:col-span-1">
+                  <h3 class="text-lg font-medium leading-6 text-gray-900">Idioma</h3>
+                  <p class="mt-1 desc text-sm leading-5 text-gray-500">Escolha o idioma da sua área de membros</p>
+                </div>
+                <div class="mt-5 md:mt-0 md:col-span-2">
+                  <div class="relative">
+                    <div class="px-4 py-5 bg-white sm:p-6 rounded-lg">
+                      <div class="flex item-center">
+                        <div>
+                          <div>
+                            <select v-model="settingsForm.language" class="form-select shadow-sm block w-full pl-3 pr-10 py-2 text-base leading-6 border-gray-300 focus:outline-none focus:shadow-outline-blue focus:border-blue-300 sm:text-sm sm:leading-5 transition ease-in-out duration-150">
+                              <option value="PT">Português</option>
+                              <option value="EN">English</option>
+                              <option value="ES">Espanhol</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-10">
+              <div class="md:grid md:grid-cols-3 md:gap-6">
+                <div class="md:col-span-1">
+                  <h3 class="text-lg font-medium leading-6 text-gray-900">Proteção anti pirataria para e-books</h3>
+                  <p class="mt-1 desc text-sm leading-5 text-gray-500">Aprenda mais sobre o sistema <a href="https://ajuda.kiwify.com.br/pt-br/article/protecao-anti-pirataria-para-e-books-drm-social-13pqdu0/" target="_blank">anti pirataria</a></p>
+                </div>
+                <div class="mt-5 md:mt-0 md:col-span-2">
+                  <div class="relative">
+                    <div class="px-4 py-5 bg-white sm:p-6 rounded-lg">
+                      <div class="flex item-center">
+                        <div class="flex items-center">
+                          <span role="checkbox" tabindex="0" :aria-checked="settingsForm.antiPiracyEnabled" class="relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:shadow-outline" :class="settingsForm.antiPiracyEnabled ? 'bg-indigo-600' : 'bg-gray-200'" @click="settingsForm.antiPiracyEnabled = !settingsForm.antiPiracyEnabled" @keydown.enter.prevent="settingsForm.antiPiracyEnabled = !settingsForm.antiPiracyEnabled">
+                            <span aria-hidden="true" class="inline-block h-5 w-5 rounded-full bg-white shadow transform transition ease-in-out duration-200" :class="settingsForm.antiPiracyEnabled ? 'translate-x-5' : 'translate-x-0'"></span>
+                          </span>
+                          <label class="block text-sm font-medium leading-5 text-gray-700 ml-2 cursor-pointer" @click="settingsForm.antiPiracyEnabled = !settingsForm.antiPiracyEnabled">Colocar marca d'água com os dados do comprador em todas as páginas</label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-10">
+              <div class="md:grid md:grid-cols-3 md:gap-6">
+                <div class="md:col-span-1">
+                  <h3 class="text-lg font-medium leading-6 text-gray-900">Suporte ao cliente</h3>
+                  <p class="mt-1 desc text-sm leading-5 text-gray-500">Esse e-mail será exibido nos e-mails de acesso enviados ao cliente, e também na Área de membros. Se deixar vazio, será usado o e-mail da sua conta Kiwify.</p>
+                </div>
+                <div class="mt-5 md:mt-0 md:col-span-2">
+                  <div class="relative">
+                    <div class="px-4 py-5 bg-white sm:p-6 rounded-lg">
+                      <div class="w-full">
+                        <label class="block text-sm font-medium leading-5 text-gray-700 mb-1">E-mail de suporte</label>
+                        <div class="max-w-xxs w-full">
+                          <input v-model="settingsForm.supportEmail" placeholder="exemplo@email.com" type="text" autocomplete="off" data-lpignore="true" class="form-input block py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:shadow-outline-blue focus:border-blue-300 transition duration-150 ease-in-out sm:text-sm sm:leading-5 mask-user-input w-full">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex mt-8 w-full justify-between">
+              <div class="inline-block -my-1 -ml-px" aria-expanded="false">
+                <button type="button" disabled="disabled" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-white bg-red-600 hover:bg-red-500 active:bg-red-700 border-transparent focus:border-red-700 focus:shadow-outline-red leading-5 text-sm px-4 py-2 gap-2 opacity-50 cursor-not-allowed shadow-sm">Excluir área de membros</button>
+              </div>
+              <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 border-transparent focus:border-indigo-700 focus:shadow-outline-indigo leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm" :disabled="settingsSaving" @click="saveSettings">{{ settingsSaving ? 'Salvando...' : 'Salvar alterações' }}</button>
             </div>
           </div>
         </div>
@@ -922,6 +1223,184 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </template>
+
+      <div v-if="showCreateCourseModal" class="fixed md:h-auto bottom-0 z-500 inset-x-0 inset-0 flex items-center justify-center">
+        <div class="fixed inset-0 transition-opacity cursor-pointer" @click="closeCourseModals">
+          <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <div role="dialog" aria-modal="true" aria-labelledby="create-course-modal-title" class="bg-white overflow-hidden md:rounded-lg sm:h-auto md:shadow-xl transform transition-all sm:max-w-sm w-full">
+          <div class="px-4 py-3 bg-gray-50 flex justify-between">
+            <h3 id="create-course-modal-title" class="text-lg leading-6 font-medium text-gray-900">Criar curso</h3>
+            <button type="button" aria-label="Cancelar" class="text-gray-400 cursor-pointer hover:text-gray-500 focus:outline-none focus:text-gray-500 transition ease-in-out duration-150" @click="closeCourseModals">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-6 w-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+          </div>
+          <div>
+            <div>
+              <div class="px-4 py-5 sm:p-6 rounded-lg">
+                <div>
+                  <label for="create-course-name" class="flex items-center text-sm font-medium leading-5 text-gray-700 mb-1">Nome do curso</label>
+                  <input id="create-course-name" v-model="courseDraft" type="text" autocomplete="off" data-lpignore="true" class="form-input block py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:shadow-outline-blue focus:border-blue-300 transition duration-150 ease-in-out sm:text-sm sm:leading-5 mask-user-input w-full">
+                </div>
+                <div class="mt-6">
+                  <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 border-transparent focus:border-indigo-700 focus:shadow-outline-indigo px-4 py-2 gap-2 cursor-pointer shadow-sm w-full" @click="createCourseFromModal">Criar curso</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="showImportCourseModal" class="fixed md:h-auto bottom-0 z-500 inset-x-0 inset-0 flex items-center justify-center">
+        <div class="fixed inset-0 transition-opacity cursor-pointer" @click="closeCourseModals">
+          <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <div role="dialog" aria-modal="true" aria-labelledby="import-course-modal-title" class="bg-white overflow-hidden sm:rounded-lg sm:h-auto md:shadow-xl transform transition-all sm:max-w-lg w-full">
+          <div class="px-4 py-3 bg-gray-50 flex justify-between">
+            <h3 id="import-course-modal-title" class="text-lg leading-6 font-medium text-gray-900">Importar curso</h3>
+            <button type="button" aria-label="Cancelar" class="text-gray-400 cursor-pointer hover:text-gray-500 focus:outline-none focus:text-gray-500 transition ease-in-out duration-150" @click="closeCourseModals">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-6 w-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+          </div>
+          <div>
+            <div>
+              <div class="px-4 py-5 sm:p-6 rounded-lg">
+                <fieldset class="form-field transition-all ease-in-out duration-300">
+                  <label for="course_id" class="form-field__label font-medium leading-5 text-sm text-gray-700 inline-flex flex-no-wrap flex-row items-center gap-1 mb-1">
+                    <div>Nome do curso</div>
+                  </label>
+                  <div class="flex flex-row items-center gap-3 min-w-0 opacity-100">
+                    <div class="flex-1 relative min-w-0">
+                      <div dir="auto" class="v-select vs--single vs--searchable">
+                        <div id="course_id" role="combobox" aria-expanded="false" aria-label="Search for option" class="vs__dropdown-toggle">
+                          <div class="vs__selected-options">
+                            <input v-model="courseDraft" placeholder="Selecione um curso" aria-autocomplete="list" type="search" autocomplete="off" class="vs__search">
+                          </div>
+                          <div class="vs__actions">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="10" role="presentation" class="vs__open-indicator"><path d="M9.211364 7.59931l4.48338-4.867229c.407008-.441854.407008-1.158247 0-1.60046l-.73712-.80023c-.407008-.441854-1.066904-.441854-1.474243 0L7 5.198617 2.51662.33139c-.407008-.441853-1.066904-.441853-1.474243 0l-.737121.80023c-.407008.441854-.407008 1.158248 0 1.600461l4.48338 4.867228L7 10l2.211364-2.40069z"></path></svg>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </fieldset>
+                <div class="mt-3 flex flex-row gap-2 transition ease-in-out duration-150 pl-3 pr-4 py-4 border-l-4 border-indigo-400 bg-indigo-50 text-indigo-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="24px" height="24px" class="flex-shrink-0 h-5 w-5 text-indigo-400"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
+                  <span class="flex flex-1 flex-col gap-1 md:flex-row md:gap-4">
+                    <p class="flex flex-1 text-sm leading-5">Apenas o curso e seus conteúdos serão duplicados. Os alunos permanecerão no curso original.</p>
+                  </span>
+                </div>
+                <div class="mt-6">
+                  <button type="button" class="inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 border-transparent focus:border-indigo-700 focus:shadow-outline-indigo px-4 py-2 gap-2 cursor-pointer shadow-sm w-full" @click="importCourseFromModal">Importar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="showGroupModal" class="fixed bottom-0 inset-x-0 sm:inset-0 sm:flex sm:items-center sm:justify-center" style="z-index: 5000;">
+        <div class="fixed inset-0 transition-opacity" @click="showGroupModal = false">
+          <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <div role="dialog" aria-modal="true" aria-labelledby="group-modal-title" class="md:max-w-5xl max-h-screen sm:rounded-lg sm:shadow-xl overflow-x-hidden overflow-y-auto transform transition-all sm:w-full">
+          <form @submit.prevent="addGroup">
+            <div class="bg-white px-4 pt-5 pb-4 sm:p-6">
+              <div>
+                <div class="mt-3 sm:mt-0 sm:ml-4 sm:text-left">
+                  <header class="flex justify-between">
+                    <h3 id="group-modal-title" class="text-lg leading-6 font-medium text-gray-900">{{ editingGroupId ? 'Editar grupo' : 'Adicionar grupo' }}</h3>
+                    <button type="button" aria-label="Cancelar" class="text-gray-400 cursor-pointer hover:text-gray-500 focus:outline-none focus:text-gray-500 transition ease-in-out duration-150" @click="showGroupModal = false">
+                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-6 w-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                  </header>
+                  <div class="mt-2">
+                    <label for="group-name" class="flex items-center text-sm font-medium leading-5 text-gray-700 mb-1">Nome do grupo</label>
+                    <input id="group-name" v-model="groupDraft" type="text" autocomplete="off" data-lpignore="true" class="form-input block py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:shadow-outline-blue focus:border-blue-300 transition duration-150 ease-in-out sm:text-sm sm:leading-5 mask-user-input w-64">
+                  </div>
+                  <div v-if="groups.find((group) => group.id === editingGroupId)?.isDefault" class="mt-5 text-sm leading-5 font-medium text-gray-700">Esse é o grupo padrão</div>
+                  <div class="mt-5">
+                    <div class="text-sm leading-5 font-medium text-gray-700">Cursos e módulos que esse grupo tem acesso</div>
+                    <label class="mt-3 flex items-center text-sm leading-5 text-gray-700">
+                      <input checked type="checkbox" class="form-checkbox h-5 w-5 text-indigo-600 transition duration-150 ease-in-out">
+                      <span class="ml-3">Todos os módulos</span>
+                    </label>
+                  </div>
+                  <div class="mt-5">
+                    <div class="text-sm leading-5 font-medium text-gray-700">Ofertas que dão acesso a esse grupo</div>
+                    <div class="mt-5 overflow-x-auto">
+                  <table class="kiwi-table min-w-full divide-y divide-gray-200">
+                    <thead>
+                      <tr>
+                        <th class="text-left px-6 py-4 border-b border-gray-200 bg-gray-50 text-xs leading-4 font-medium text-gray-500 uppercase tracking-widest">Produto</th>
+                        <th class="text-left px-6 py-4 border-b border-gray-200 bg-gray-50 text-xs leading-4 font-medium text-gray-500 uppercase tracking-widest">Oferta</th>
+                        <th class="text-left px-6 py-4 border-b border-gray-200 bg-gray-50 text-xs leading-4 font-medium text-gray-500 uppercase tracking-widest">Preço</th>
+                      </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                      <tr>
+                        <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-900">{{ areaName }}</td>
+                        <td class="px-6 py-5 whitespace-nowrap text-sm font-medium text-gray-900">{{ selectedCourse?.title || areaName }}</td>
+                        <td class="px-6 py-5 whitespace-nowrap text-sm text-gray-500">R$ 19,00</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="bg-gray-50 px-4 py-3 sm:px-6 flex items-center justify-end gap-4">
+              <button type="button" class="w-auto inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-gray-700 hover:text-gray-500 active:text-gray-800 bg-white active:bg-gray-50 border-gray-300 focus:border-blue-300 focus:shadow-outline-blue leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm" @click="showGroupModal = false">Cancelar</button>
+              <button type="submit" class="w-auto inline-flex justify-center items-center text-center font-medium rounded-md border transition ease-in-out duration-150 focus:outline-none text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 border-transparent focus:border-indigo-700 focus:shadow-outline-indigo leading-5 text-sm px-4 py-2 gap-2 cursor-pointer shadow-sm">{{ editingGroupId ? 'Salvar alterações' : 'Adicionar grupo' }}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div v-if="showAddStudentModal" class="fixed inset-0 z-500 flex flex-col md:items-center md:justify-center md:h-auto md:max-h-full md:p-4">
+        <div class="fixed inset-0 transition-opacity cursor-pointer" @click="closeAddStudentModal">
+          <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+        <div role="dialog" aria-modal="true" aria-labelledby="add-student-modal-title" class="bg-white h-full overflow-x-auto transform transition-all w-full sm:h-auto md:max-h-full md:rounded-lg md:shadow-xl sm:max-w-md">
+          <form @submit.prevent="submitAddStudent">
+            <div class="px-4 py-3 bg-gray-50 flex justify-between">
+              <h3 id="add-student-modal-title" class="text-lg leading-6 font-medium text-gray-900">{{ editingStudentId ? 'Editar aluno' : 'Adicionar aluno' }}</h3>
+              <button type="button" aria-label="Close" class="text-gray-400 cursor-pointer hover:text-gray-500 focus:outline-none focus:text-gray-500 transition ease-in-out duration-150" @click="closeAddStudentModal">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" class="h-6 w-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+            <div class="px-4 py-5 sm:p-6">
+              <div v-if="addStudentError" class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700">{{ addStudentError }}</div>
+              <div :class="addStudentError ? 'mt-5' : ''">
+                <label class="block text-sm font-medium leading-5 text-gray-700 mb-1">Nome do aluno</label>
+                <input v-model="studentDraft.name" type="text" autocomplete="off" data-lpignore="true" class="form-input block py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:shadow-outline-blue focus:border-blue-300 transition duration-150 ease-in-out sm:text-sm sm:leading-5 mask-user-input w-full">
+              </div>
+              <div class="mt-4">
+                <label class="block text-sm font-medium leading-5 text-gray-700 mb-1">E-mail</label>
+                <input v-model="studentDraft.email" type="email" autocomplete="off" data-lpignore="true" class="form-input block py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:shadow-outline-blue focus:border-blue-300 transition duration-150 ease-in-out sm:text-sm sm:leading-5 mask-user-input w-full">
+              </div>
+              <div class="mt-4">
+                <label class="block text-sm font-medium leading-5 text-gray-700 mb-1">Grupos</label>
+                <div class="form-select block w-full py-2 px-3 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:shadow-outline-blue focus:border-blue-300 transition duration-150 ease-in-out sm:text-sm sm:leading-5 relative">
+                  <span class="inline-flex items-center rounded bg-gray-200 px-1.5 py-0.5 text-sm leading-5 text-gray-900">
+                    {{ groups.find((group) => group.id === studentDraft.groupId)?.name || 'Grupo A' }}
+                    <button type="button" class="ml-1 text-gray-500 hover:text-gray-700" aria-label="Remover grupo">×</button>
+                  </span>
+                  <svg viewBox="0 0 20 20" fill="currentColor" class="chevron-down absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                  <select v-model="studentDraft.groupId" class="absolute inset-0 h-full w-full opacity-0 cursor-pointer">
+                    <option v-for="group in groups" :key="group.id" :value="group.id">{{ group.name }}</option>
+                  </select>
+                </div>
+              </div>
+              <button type="submit" class="mt-5 cursor-pointer flex justify-center items-center text-center w-full px-4 py-2 border border-transparent text-base leading-6 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-500 focus:outline-none focus:border-indigo-700 focus:shadow-outline-indigo active:bg-indigo-700 transition ease-in-out duration-150" :disabled="addingStudent">
+                {{ addingStudent ? (editingStudentId ? 'Salvando...' : 'Adicionando...') : (editingStudentId ? 'Salvar alterações' : 'Adicionar aluno') }}
+              </button>
+              <button v-if="!editingStudentId" type="button" class="mt-5 block mx-auto text-indigo-500 underline text-base leading-6">Importar alunos em massa</button>
+            </div>
+          </form>
+        </div>
+      </div>
 
       <div v-if="showModuleModal" class="fixed inset-0 z-500 flex flex-col md:items-center md:justify-center md:h-auto md:max-h-full md:p-4">
         <div class="fixed inset-0 transition-opacity cursor-pointer" @click="showModuleModal = false">

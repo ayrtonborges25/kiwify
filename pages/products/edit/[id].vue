@@ -18,7 +18,6 @@ const route = useRoute()
 const productId = computed(() => String(route.params.id || 'ae3c3610-f0af-11f0-b85d-45218e98c266'))
 const isNewProduct = computed(() => productId.value === 'new')
 const product = computed(() => isNewProduct.value ? undefined : getProductById(productId.value))
-const { canAccessAdmin, canEditProduct } = usePermissions()
 const isSavingProduct = ref(false)
 const deleteConfirmation = ref('')
 const isDeletingProduct = ref(false)
@@ -64,13 +63,6 @@ const confirmDeleteProduct = async () => {
     isDeletingProduct.value = false
   }
 }
-onMounted(async () => {
-  const allowed = isNewProduct.value
-    ? await canAccessAdmin()
-    : await canEditProduct(productId.value)
-
-  if (!allowed) await navigateTo('/no-access')
-})
 const parseMoneyInput = (value = '') => {
   if (!value.trim()) return ''
   const numeric = Number(value.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.')) || 0

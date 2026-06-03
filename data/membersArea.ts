@@ -62,6 +62,9 @@ export interface MembersAreaLesson {
 export interface MembersAreaSettings {
   type: 'lite' | 'complete'
   commentsEnabled: boolean
+  language?: string
+  antiPiracyEnabled?: boolean
+  supportEmail?: string
 }
 
 export interface MembersAreaCustomization {

@@ -413,19 +413,55 @@ export const listMembersAreaStudents = async (membersAreaId: string): Promise<Me
       ]
     }
 
+    const { data: userSession } = await supabase.auth.getUser()
+    const currentUserEmail = String(userSession.user?.email || '').trim().toLowerCase()
+    const isCurrentUserEmail = (email?: string | null) => Boolean(currentUserEmail && String(email || '').trim().toLowerCase() === currentUserEmail)
+
+    try {
+      const serverRows = await $fetch<MembersAreaStudent[]>(`/api/members-area/${membersAreaId}/students`, {
+        query: { currentUserEmail }
+      })
+      if (Array.isArray(serverRows)) return serverRows
+    } catch {
+      // Mantem a consulta client-side como fallback quando o servidor local ainda nao foi reiniciado.
+    }
+
     const { data: area } = await supabase
       .from('members_areas')
-      .select('id,product_id,courses(id,product_id)')
+      .select('id')
       .eq('id', membersAreaId)
       .maybeSingle()
 
+    const { data: courses } = await supabase
+      .from('courses')
+      .select('product_id')
+      .eq('members_area_id', membersAreaId)
+
     const productIds = new Set<string>()
-    if (area?.product_id) productIds.add(area.product_id)
-    ;(area?.courses || []).forEach((course: Record<string, any>) => {
+    if (!area?.id) return []
+    ;(courses || []).forEach((course: Record<string, any>) => {
       if (course.product_id) productIds.add(course.product_id)
     })
 
     if (!productIds.size) return []
+
+    const { data: deliveries } = await supabase
+      .from('product_deliveries')
+      .select('id,customer_email,created_at,product_id')
+      .in('product_id', [...productIds])
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+
+    const deliveryStudents = (deliveries || []).map((row: Record<string, any>, index: number) => ({
+      id: row.id,
+      name: row.customer_email || `Aluno ${index + 1}`,
+      email: row.customer_email || '',
+      lastAccess: new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(row.created_at)),
+      progress: index === 0 ? 100 : 0,
+      isCurrentUser: isCurrentUserEmail(row.customer_email)
+    }))
+
+    const deliveryEmails = new Set(deliveryStudents.map((student) => student.email.toLowerCase()).filter(Boolean))
 
     const { data, error } = await supabase
       .from('sales')
@@ -434,9 +470,11 @@ export const listMembersAreaStudents = async (membersAreaId: string): Promise<Me
       .in('status', ['approved', 'Pago'])
       .order('created_at', { ascending: false })
 
-    if (error) return []
+    if (error) return deliveryStudents
 
-    return (data || []).map((row: Record<string, any>, index: number) => ({
+    const saleStudents = (data || [])
+      .filter((row: Record<string, any>) => !deliveryEmails.has(String(row.customer_email || '').toLowerCase()))
+      .map((row: Record<string, any>, index: number) => ({
       id: row.id,
       name: row.customer_name || row.customer_email || `Aluno ${index + 1}`,
       email: row.customer_email || '',
@@ -444,10 +482,148 @@ export const listMembersAreaStudents = async (membersAreaId: string): Promise<Me
         ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(row.paid_at))
         : new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(row.created_at)),
       progress: index === 0 ? 100 : 0,
-      isCurrentUser: index === 0
+      isCurrentUser: isCurrentUserEmail(row.customer_email)
     }))
+
+    return [...deliveryStudents, ...saleStudents]
   } catch {
     return []
+  }
+}
+
+const getMembersAreaSessionToken = async () => {
+  const supabase = getSupabaseClient()
+  if (!supabase) return ''
+
+  const { data: sessionData } = await supabase.auth.getSession()
+  return sessionData.session?.access_token || ''
+}
+
+export const addMembersAreaStudent = async (
+  membersAreaId: string,
+  payload: { name: string; email: string; groupId?: string }
+): Promise<MembersAreaStudent | null> => {
+  const email = payload.email.trim().toLowerCase()
+  const name = payload.name.trim() || email
+
+  if (!email) throw new Error('Informe o e-mail do aluno.')
+
+  try {
+    const supabase = getSupabaseClient()
+    if (!supabase) {
+      return {
+        id: createMockId(),
+        name,
+        email,
+        lastAccess: new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date()),
+        progress: 0
+      }
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData.session?.access_token
+    if (!token) throw new Error('Faça login novamente para adicionar alunos.')
+
+    const sale = await $fetch<Record<string, any>>(`/api/members-area/${membersAreaId}/students`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${token}`
+      },
+      body: {
+        name,
+        email,
+        groupId: payload.groupId
+      }
+    })
+
+    return {
+      id: sale.id,
+      name: sale.customer_name || name,
+      email: sale.customer_email || email,
+      lastAccess: new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(sale.paid_at || sale.created_at || new Date())),
+      progress: 0
+    }
+  } catch (error: any) {
+    const message = error?.data?.statusMessage || error?.statusMessage || error?.message
+    throw new Error(message || 'Nao foi possivel adicionar o aluno.')
+  }
+}
+
+export const resendMembersAreaStudentAccess = async (
+  membersAreaId: string,
+  studentId: string
+) => {
+  const token = await getMembersAreaSessionToken()
+  if (!token) throw new Error('Faça login novamente para reenviar o acesso.')
+
+  try {
+    return await $fetch<Record<string, any>>(`/api/members-area/${membersAreaId}/students/${studentId}/resend`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${token}`
+      }
+    })
+  } catch (error: any) {
+    const message = error?.data?.statusMessage || error?.statusMessage || error?.message
+    throw new Error(message || 'Nao foi possivel reenviar o email de acesso.')
+  }
+}
+
+export const removeMembersAreaStudentAccess = async (
+  membersAreaId: string,
+  studentId: string
+) => {
+  const token = await getMembersAreaSessionToken()
+  if (!token) throw new Error('Faça login novamente para remover o acesso.')
+
+  try {
+    return await $fetch<Record<string, any>>(`/api/members-area/${membersAreaId}/students/${studentId}`, {
+      method: 'DELETE',
+      headers: {
+        authorization: `Bearer ${token}`
+      }
+    })
+  } catch (error: any) {
+    const message = error?.data?.statusMessage || error?.statusMessage || error?.message
+    throw new Error(message || 'Nao foi possivel remover o acesso.')
+  }
+}
+
+export const updateMembersAreaStudent = async (
+  membersAreaId: string,
+  studentId: string,
+  payload: { name: string; email: string; groupId?: string }
+): Promise<MembersAreaStudent | null> => {
+  const email = payload.email.trim().toLowerCase()
+  const name = payload.name.trim() || email
+  if (!email) throw new Error('Informe o e-mail do aluno.')
+
+  const token = await getMembersAreaSessionToken()
+  if (!token) throw new Error('Faça login novamente para editar o aluno.')
+
+  try {
+    const row = await $fetch<Record<string, any>>(`/api/members-area/${membersAreaId}/students/${studentId}`, {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${token}`
+      },
+      body: {
+        name,
+        email,
+        groupId: payload.groupId
+      }
+    })
+
+    return {
+      id: row.id,
+      name: row.customer_name || name,
+      email: row.customer_email || email,
+      lastAccess: new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(row.paid_at || row.created_at || new Date())),
+      progress: Number(row.progress || 0)
+    }
+  } catch (error: any) {
+    const message = error?.data?.statusMessage || error?.statusMessage || error?.message
+    throw new Error(message || 'Nao foi possivel editar o aluno.')
   }
 }
 

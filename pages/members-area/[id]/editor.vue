@@ -426,6 +426,10 @@ const saveCustomization = async () => {
 }
 
 watch(membersArea, hydrate, { immediate: true })
+
+onMounted(() => {
+  previewRefreshKey.value += 1
+})
 </script>
 
 <template>

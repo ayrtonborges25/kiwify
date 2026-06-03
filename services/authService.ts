@@ -1,5 +1,5 @@
 import type { Session, User } from '@supabase/supabase-js'
-import { canAccessAdmin } from '~/services/permissionsService'
+import { canAccessAdmin, canAccessMembersArea } from '~/services/permissionsService'
 import { normalizeAccountDisplayName } from '~/utils/accountDisplay'
 import { getSupabaseClient } from '~/utils/supabase'
 
@@ -18,7 +18,6 @@ type AuthMetadata = {
 }
 
 const normalizeEmail = (email?: string | null) => String(email || '').trim().toLowerCase()
-const approvedStatuses = new Set(['approved', 'pago', 'recebido', 'confirmado'])
 
 const workspaceNameForUser = (user: User, metadata: AuthMetadata = {}) => {
   const name = String(metadata.name || user.user_metadata?.name || '').trim()
@@ -197,9 +196,11 @@ export const requireStudentAccess = async (clubId: string) => {
   const supabase = getSupabaseClient()
   if (!supabase) return false
 
+  if (await canAccessMembersArea(clubId)) return true
+
   const { data: deliveries, error } = await supabase
     .from('product_deliveries')
-    .select('id, user_id, product_id, customer_email, access_url, status, sales!inner(status, customer_email, product_id, user_id)')
+    .select('id, user_id, product_id, customer_email, access_url, status')
     .or(`customer_email.ilike.${email},user_id.eq.${auth.user.id}`)
     .eq('status', 'active')
 
@@ -207,12 +208,9 @@ export const requireStudentAccess = async (clubId: string) => {
 
   const directAccessUrl = `/club=${clubId}`
   const approvedDeliveries = deliveries.filter((delivery: Record<string, any>) => {
-    const sale = Array.isArray(delivery.sales) ? delivery.sales[0] : delivery.sales
     return (
       (normalizeEmail(delivery.customer_email) === email || delivery.user_id === auth.user.id) &&
-      String(delivery.status || '').toLowerCase() === 'active' &&
-      approvedStatuses.has(String(sale?.status || '').toLowerCase()) &&
-      (normalizeEmail(sale?.customer_email || email) === email || sale?.user_id === auth.user.id)
+      String(delivery.status || '').toLowerCase() === 'active'
     )
   })
 
@@ -221,18 +219,15 @@ export const requireStudentAccess = async (clubId: string) => {
   }
 
   const productIds = approvedDeliveries
-    .map((delivery: Record<string, any>) => {
-      const sale = Array.isArray(delivery.sales) ? delivery.sales[0] : delivery.sales
-      return delivery.product_id || sale?.product_id
-    })
+    .map((delivery: Record<string, any>) => delivery.product_id)
     .filter(Boolean)
 
   if (!productIds.length) return false
 
   const { data: area } = await supabase
-    .from('members_areas')
-    .select('id, product_id')
-    .eq('id', clubId)
+    .from('courses')
+    .select('id')
+    .eq('members_area_id', clubId)
     .in('product_id', productIds)
     .maybeSingle()
 

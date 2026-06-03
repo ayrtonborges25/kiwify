@@ -101,7 +101,27 @@ const logout = async () => {
         </svg>
       </button>
       <div v-if="accountMenuOpen && !isCollapsed" class="club-sidebar__account-menu" role="menu">
-        <NuxtLink to="/myprofile" class="club-sidebar__account-menu-item" role="menuitem" @click="closeAccountMenu">
+        <a
+          v-if="editorPreview"
+          href="/myprofile"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="club-sidebar__account-menu-item"
+          role="menuitem"
+          @click="closeAccountMenu"
+        >
+          <span class="club-sidebar__account-menu-icon">
+            <svg viewBox="0 0 448 512" aria-hidden="true"><path fill="currentColor" d="M224 256A128 128 0 1 0 224 0a128 128 0 1 0 0 256m89.6 32h-16.7c-22.2 10.2-46.9 16-72.9 16s-50.6-5.8-72.9-16h-16.7C60.2 288 0 348.2 0 422.4V464c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48v-41.6c0-74.2-60.2-134.4-134.4-134.4" /></svg>
+          </span>
+          <span>Meu perfil</span>
+        </a>
+        <NuxtLink
+          v-else
+          to="/myprofile"
+          class="club-sidebar__account-menu-item"
+          role="menuitem"
+          @click="closeAccountMenu"
+        >
           <span class="club-sidebar__account-menu-icon">
             <svg viewBox="0 0 448 512" aria-hidden="true"><path fill="currentColor" d="M224 256A128 128 0 1 0 224 0a128 128 0 1 0 0 256m89.6 32h-16.7c-22.2 10.2-46.9 16-72.9 16s-50.6-5.8-72.9-16h-16.7C60.2 288 0 348.2 0 422.4V464c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48v-41.6c0-74.2-60.2-134.4-134.4-134.4" /></svg>
           </span>

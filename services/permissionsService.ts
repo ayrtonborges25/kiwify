@@ -11,7 +11,6 @@ export type UserWorkspace = {
 }
 
 const normalizeEmail = (email?: string | null) => String(email || '').trim().toLowerCase()
-const approvedStatuses = new Set(['approved', 'pago', 'recebido', 'confirmado'])
 
 const getSupabaseUser = async () => {
   const supabase = getSupabaseClient()
@@ -19,6 +18,15 @@ const getSupabaseUser = async () => {
   const { data, error } = await supabase.auth.getUser()
   if (error || !data.user) return null
   return data.user
+}
+
+const callBooleanRpc = async (name: string, params: Record<string, string>) => {
+  const supabase = getSupabaseClient()
+  if (!supabase) return false
+
+  const { data, error } = await supabase.rpc(name, params)
+  if (error) return false
+  return Boolean(data)
 }
 
 const isLegacyAdmin = async () => {
@@ -83,6 +91,7 @@ export const getCurrentWorkspace = async () => {
 }
 
 export const canAccessAdmin = async () => {
+  if (await callBooleanRpc('can_access_admin', {})) return true
   const workspaces = await listUserWorkspaces()
   if (workspaces.length) return true
   return isLegacyAdmin()
@@ -90,6 +99,7 @@ export const canAccessAdmin = async () => {
 
 export const canAccessWorkspace = async (workspaceId?: string | null) => {
   if (!workspaceId) return false
+  if (await callBooleanRpc('can_access_workspace', { target_workspace_id: workspaceId })) return true
   if (await isLegacyAdmin()) return true
   const workspaces = await listUserWorkspaces()
   return workspaces.some((workspace) => workspace.id === workspaceId)
@@ -133,6 +143,7 @@ const getWorkspaceRole = async (workspaceId?: string | null): Promise<WorkspaceR
 
 export const canManageProduct = async (productId?: string | null) => {
   if (!productId) return false
+  if (await callBooleanRpc('can_manage_product', { target_product_id: productId })) return true
   if (await isLegacyAdmin()) return true
 
   const [user, product, productRole] = await Promise.all([
@@ -151,6 +162,7 @@ export const canManageProduct = async (productId?: string | null) => {
 
 export const canEditProduct = async (productId?: string | null) => {
   if (!productId) return false
+  if (await callBooleanRpc('can_edit_product', { target_product_id: productId })) return true
   if (await isLegacyAdmin()) return true
 
   const [user, product, productRole] = await Promise.all([
@@ -172,6 +184,7 @@ export const canViewSales = async (workspaceId?: string | null) => canAccessWork
 export const canAccessMembersArea = async (membersAreaId?: string | null) => {
   const supabase = getSupabaseClient()
   if (!supabase || !membersAreaId) return false
+  if (await callBooleanRpc('can_access_members_area', { target_members_area_id: membersAreaId })) return true
   if (await isLegacyAdmin()) return true
 
   const { data, error } = await supabase
@@ -195,9 +208,11 @@ export const canAccessClub = async (clubId?: string | null) => {
   const email = normalizeEmail(user?.email)
   if (!supabase || !user?.id || !email || !clubId) return false
 
+  if (await canAccessMembersArea(clubId)) return true
+
   const { data: deliveries, error } = await supabase
     .from('product_deliveries')
-    .select('id, user_id, product_id, customer_email, access_url, status, sales!inner(status, customer_email, product_id, user_id)')
+    .select('id, user_id, product_id, customer_email, access_url, status')
     .or(`customer_email.ilike.${email},user_id.eq.${user.id}`)
     .eq('status', 'active')
 
@@ -205,12 +220,9 @@ export const canAccessClub = async (clubId?: string | null) => {
 
   const directAccessUrl = `/club=${clubId}`
   const approvedDeliveries = deliveries.filter((delivery: Record<string, any>) => {
-    const sale = Array.isArray(delivery.sales) ? delivery.sales[0] : delivery.sales
     return (
       (normalizeEmail(delivery.customer_email) === email || delivery.user_id === user.id) &&
-      String(delivery.status || '').toLowerCase() === 'active' &&
-      approvedStatuses.has(String(sale?.status || '').toLowerCase()) &&
-      (normalizeEmail(sale?.customer_email || email) === email || sale?.user_id === user.id)
+      String(delivery.status || '').toLowerCase() === 'active'
     )
   })
 
@@ -219,18 +231,15 @@ export const canAccessClub = async (clubId?: string | null) => {
   }
 
   const productIds = approvedDeliveries
-    .map((delivery: Record<string, any>) => {
-      const sale = Array.isArray(delivery.sales) ? delivery.sales[0] : delivery.sales
-      return delivery.product_id || sale?.product_id
-    })
+    .map((delivery: Record<string, any>) => delivery.product_id)
     .filter(Boolean)
 
   if (!productIds.length) return false
 
   const { data: area } = await supabase
-    .from('members_areas')
-    .select('id, product_id')
-    .eq('id', clubId)
+    .from('courses')
+    .select('id')
+    .eq('members_area_id', clubId)
     .in('product_id', productIds)
     .maybeSingle()
 

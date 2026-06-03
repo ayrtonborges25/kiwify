@@ -2,6 +2,7 @@ import {
   createCourse as serviceCreateCourse,
   createModule as serviceCreateModule,
   createMembersArea as serviceCreateMembersArea,
+  addMembersAreaStudent as serviceAddMembersAreaStudent,
   deleteLesson as serviceDeleteLesson,
   deleteMembersArea as serviceDeleteMembersArea,
   deleteModule as serviceDeleteModule,
@@ -14,11 +15,14 @@ import {
   listMembersAreaModules,
   listMembersAreaStudents,
   listMembersAreas,
+  removeMembersAreaStudentAccess as serviceRemoveMembersAreaStudentAccess,
+  resendMembersAreaStudentAccess as serviceResendMembersAreaStudentAccess,
   saveLesson as serviceSaveLesson,
   saveMembersAreaCustomization as serviceSaveMembersAreaCustomization,
   saveMembersAreaGroups as serviceSaveMembersAreaGroups,
   saveMembersAreaSettings as serviceSaveMembersAreaSettings,
   updateModule as serviceUpdateModule,
+  updateMembersAreaStudent as serviceUpdateMembersAreaStudent,
   updateMembersArea as serviceUpdateMembersArea
 } from '~/services/membersAreaService'
 
@@ -69,6 +73,10 @@ export function useMembersArea() {
   }
 
   const saveMembersAreaGroups = async (...args: Parameters<typeof serviceSaveMembersAreaGroups>) => serviceSaveMembersAreaGroups(...args)
+  const addMembersAreaStudent = async (...args: Parameters<typeof serviceAddMembersAreaStudent>) => serviceAddMembersAreaStudent(...args)
+  const resendMembersAreaStudentAccess = async (...args: Parameters<typeof serviceResendMembersAreaStudentAccess>) => serviceResendMembersAreaStudentAccess(...args)
+  const removeMembersAreaStudentAccess = async (...args: Parameters<typeof serviceRemoveMembersAreaStudentAccess>) => serviceRemoveMembersAreaStudentAccess(...args)
+  const updateMembersAreaStudent = async (...args: Parameters<typeof serviceUpdateMembersAreaStudent>) => serviceUpdateMembersAreaStudent(...args)
 
   const createCourse = async (...args: Parameters<typeof serviceCreateCourse>) => {
     const course = await serviceCreateCourse(...args)
@@ -101,6 +109,10 @@ export function useMembersArea() {
     listCourseModules,
     listMembersAreaStudents,
     listMembersAreaGroups,
+    addMembersAreaStudent,
+    resendMembersAreaStudentAccess,
+    removeMembersAreaStudentAccess,
+    updateMembersAreaStudent,
     createMembersArea,
     updateMembersArea,
     saveMembersAreaSettings,

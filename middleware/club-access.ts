@@ -8,6 +8,11 @@ export default defineNuxtRouteMiddleware(async (to) => {
   const accessByClub = useState<Record<string, boolean>>('club-access:by-club', () => ({}))
   delete accessByClub.value[clubId]
 
+  if (to.query.editor === '1') {
+    accessByClub.value[clubId] = true
+    return
+  }
+
   const auth = await requireAuth()
   if (!auth) {
     return navigateTo(`/student/login?clubId=${encodeURIComponent(clubId)}&redirect=${encodeURIComponent(to.fullPath)}`)
